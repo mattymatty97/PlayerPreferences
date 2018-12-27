@@ -30,6 +30,7 @@ namespace PlayerPreferences
         private Role[] preferences;
         public Role[] Preferences
         {
+            get => preferences;
             set
             {
                 if (value.Length != Plugin.Roles.Count)

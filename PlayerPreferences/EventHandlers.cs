@@ -1,14 +1,16 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Linq;
-using scp4aiur;
 using Smod2.EventHandlers;
 using Smod2.Events;
 using System.Text.RegularExpressions;
+using Smod2;
+using Smod2.API;
+using Smod2.EventSystem.Events;
 using UnityEngine;
 
 namespace PlayerPreferences
 {
-    public class EventHandlers : IEventHandlerCallCommand, IEventHandlerRoundStart
+    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerRoundStart, IEventHandlerTeamRespawn
     {
         private readonly Plugin plugin;
 
@@ -19,9 +21,29 @@ namespace PlayerPreferences
             this.plugin = plugin;
         }
 
+        public void OnPlayerJoin(PlayerJoinEvent ev)
+        {
+            if (!Plugin.preferences.Contains(ev.Player.SteamId))
+            {
+                Plugin.preferences.Add(ev.Player.SteamId, Plugin.Roles.Select(x => x.Value).ToArray());
+            }
+        }
+
         public void OnRoundStart(RoundStartEvent ev)
         {
             plugin.RefreshConfig();
+
+            List<Player> players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToList();
+            Dictionary<Role, int> roleCounts = players.GroupBy(x => x.TeamRole.Role).ToDictionary(x => x.Key, x => x.Count());
+            
+            foreach (Role preference in roleCounts.Keys)
+            {
+                foreach (Player player in RankByRole(players, preference).Take(roleCounts[preference]))
+                {
+                    player.ChangeRole(preference);
+                    players.Remove(player);
+                }
+            }
         }
 
         public void OnCallCommand(PlayerCallCommandEvent ev)
@@ -46,9 +68,109 @@ namespace PlayerPreferences
                     }
                 }
 
-                if (args.Length > 1)
+                if (args.Length > 0)
                 {
-                    
+                    if (!int.TryParse(args[0], out int rank))
+                    {
+                        if (args[0] == "help")
+                        {
+                            ev.ReturnMessage = "\n" +
+                                               "\"playerprefs\" - Gets all ranks with their corresponding roles\n" +
+                                               "\"playerprefs help\" - Shows you this page you big dumb.\n" +
+                                               $"\"playerprefs [role name] [rank]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
+                        }
+                        if (rank > Plugin.Roles.Count)
+                        {
+                            ev.ReturnMessage = "\n" +
+                                               "Invalid rank number.";
+                        }
+                    }
+                    // Correct index (since menu starts at 1)
+                    rank = rank - 1;
+
+                    PlayerRecord record = Plugin.preferences[ev.Player.SteamId];
+
+                    if (args.Length > 1)
+                    {
+                        Role newRole = Plugin.GetRole(args[1]);
+
+                        int curIndex = -1;
+                        for (int i = 0; i < record.Preferences.Length; i++)
+                        {
+                            if (record.Preferences[i] == newRole)
+                            {
+                                curIndex = i;
+                                break;
+                            }
+                        }
+
+                        Role existingRole = record[rank];
+
+                        record[rank] = newRole;
+                        record[curIndex] = existingRole;
+
+                        ev.ReturnMessage = "\n" +
+                                           "Updated role rank.";
+                    }
+                }
+                else
+                {
+                    int i = 1;
+                    ev.ReturnMessage = "\n" +
+                                       $"{string.Join("\n", Plugin.preferences[ev.Player.SteamId].Preferences.Select(x => $"{i++} - {Plugin.RoleNames[x]}"))}\n" +
+                                       "Use \"help\" as an argument for additional command info.";
+                }
+            }
+        }
+
+        private IEnumerable<Player> RankByRole(IEnumerable<Player> players, Role role)
+        {
+            return players.OrderByDescending(x =>
+            {
+                PlayerRecord record = Plugin.preferences[x.SteamId];
+
+                int index = Plugin.Roles.Count;
+                for (int i = 0; i < record.Preferences.Length; i++)
+                {
+                    if (record[index] == role)
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+
+                return index;
+            });
+        }
+
+        public void OnTeamRespawn(TeamRespawnEvent ev)
+        {
+            IEnumerable<Player> spectators = PluginManager.Manager.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR);
+
+            int count = ev.PlayerList.Count;
+            if (ev.SpawnChaos)
+            {
+                ev.PlayerList = RankByRole(spectators, Role.CHAOS_INSURGENCY).Take(count).ToList();
+            }
+            else
+            {
+                Player[] spectatorArray = spectators.ToArray();
+
+                List<Player> commander = new List<Player>
+                {
+                    RankByRole(spectatorArray, Role.NTF_COMMANDER).First()
+                };
+                if (count > 1)
+                {
+                    IEnumerable<Player> otherSpawns = RankByRole(spectatorArray.Skip(1), Role.NTF_LIEUTENANT).Take(Mathf.Min(count - 1, 3));
+
+                    if (count > 4)
+                    {
+                        otherSpawns = otherSpawns.Concat(RankByRole(spectatorArray, Role.NTF_CADET)
+                            .Take(Mathf.Min(count - 4, 5)));
+                    }
+
+                    ev.PlayerList = commander.Concat(otherSpawns).ToList();
                 }
             }
         }

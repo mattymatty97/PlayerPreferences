@@ -12,10 +12,10 @@ namespace PlayerPreferences
         name = "Player Preferences",
         author = "4aiur",
         description = "Allows players to set their respawn role preferences.",
-        id = "4aiur.playerpreferences",
-        SmodRevision = 3,
-        SmodMajor = 2,
-        SmodMinor = 0,
+        id = "4aiur.custom.playerpreferences",
+        SmodMajor = 3,
+        SmodMinor = 2,
+        SmodRevision = 0,
         version = "1.0.0"
             )]
     public class Plugin : Smod2.Plugin
@@ -83,23 +83,27 @@ namespace PlayerPreferences
                 Role.SCP_939_89
             }
         };
+        public static Dictionary<Role, string> RoleNames { get; private set; }
 
         internal static Preferences preferences;
         internal static string[] ranks;
 
         public override void Register()
         {
+            RoleNames = Roles.ToDictionary(x => x.Value, x => x.Key);
+
             Timing.Init(this);
             preferences = new Preferences("PlayerPrefs", Info);
 
             AddConfig(new ConfigSetting("playerprefs_rank", new[] {"owner"}, SettingType.LIST, true, "Ranks allowed to adjust player preferences."));
-
-            string[] aliases = new[]
+            AddConfig(new ConfigSetting("playerprefs_aliases", new[]
             {
                 "pp",
                 "prefs",
-                "playerprefs",
-            };
+                "playerprefs"
+            }, SettingType.LIST, true, "Client console commands that can be used to run the Player Preferences."));
+
+            string[] aliases = GetConfigList("playerprefs_aliases");
             AddEventHandlers(new EventHandlers(this)
             {
                 CommandAliases = aliases
@@ -155,7 +159,7 @@ namespace PlayerPreferences
 
         public static Role GetRole(string name)
         {
-            return Roles.Select(x => (x.Value, LevenshteinDistance(name, x.Key))).OrderByDescending(x => x.Item2).First().Item1;
+            return Roles.Select(x => (x.Value, LevenshteinDistance(name, x.Key))).OrderBy(x => x.Item2).First().Item1;
         }
     }
 }

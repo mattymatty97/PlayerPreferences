@@ -56,7 +56,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EventHandlers.cs" />
+    <Compile Include="PlayerPrefCommand.cs" />
     <Compile Include="Plugin.cs" />
+    <Compile Include="PreferenceRecord.cs" />
+    <Compile Include="Preferences.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Timing.cs" />
   </ItemGroup>

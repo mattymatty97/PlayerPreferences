@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using Smod2.EventHandlers;
 using Smod2.Events;
 using System.Text.RegularExpressions;
@@ -29,19 +30,38 @@ namespace PlayerPreferences
             }
         }
 
+        private static void Shuffle<T>(IList<T> list)
+        {
+            int n = list.Count;
+            while (n > 1)
+            {
+                n--;
+                int k = Random.Range(0, n + 1);
+                T value = list[k];
+                list[k] = list[n];
+                list[n] = value;
+            }
+        }
+
         public void OnRoundStart(RoundStartEvent ev)
         {
             plugin.RefreshConfig();
 
             List<Player> players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToList();
+            Shuffle(players);
+
             Dictionary<Role, int> roleCounts = players.GroupBy(x => x.TeamRole.Role).ToDictionary(x => x.Key, x => x.Count());
-            
-            foreach (Role preference in roleCounts.Keys)
+
+            foreach (Player player in players)
             {
-                foreach (Player player in RankByRole(players, preference).Take(roleCounts[preference]))
+                foreach (Role role in Plugin.preferences[player.SteamId].Preferences)
                 {
-                    player.ChangeRole(preference);
-                    players.Remove(player);
+                    if (roleCounts.ContainsKey(role) && roleCounts[role] > 0)
+                    {
+                        roleCounts[role]--;
+                        player.ChangeRole(role);
+                        break;
+                    }
                 }
             }
         }
@@ -123,16 +143,16 @@ namespace PlayerPreferences
             }
         }
 
-        private IEnumerable<Player> RankByRole(IEnumerable<Player> players, Role role)
+        private static IEnumerable<Player> RankByRole(IEnumerable<Player> players, Role role)
         {
             return players.OrderByDescending(x =>
             {
                 PlayerRecord record = Plugin.preferences[x.SteamId];
 
-                int index = Plugin.Roles.Count;
+                int index = record.Preferences.Length;
                 for (int i = 0; i < record.Preferences.Length; i++)
                 {
-                    if (record[index] == role)
+                    if (record[i] == role)
                     {
                         index = i;
                         break;

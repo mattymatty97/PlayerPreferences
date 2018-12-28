@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using Smod2.EventHandlers;
 using Smod2.Events;
 using System.Text.RegularExpressions;
@@ -43,6 +42,26 @@ namespace PlayerPreferences
             }
         }
 
+        private static Dictionary<Player, Role> AssignPlayers(IReadOnlyList<Player> players, IDictionary<Role, int> maxRoles)
+        {
+            Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => Role.UNASSIGNED);
+
+            foreach (Player player in players)
+            {
+                foreach (Role role in Plugin.preferences[player.SteamId].Preferences)
+                {
+                    if (maxRoles.ContainsKey(role) && maxRoles[role] > 0)
+                    {
+                        maxRoles[role]--;
+                        playerRoles[player] = role;
+                        break;
+                    }
+                }
+            }
+
+            return playerRoles;
+        }
+
         public void OnRoundStart(RoundStartEvent ev)
         {
             plugin.RefreshConfig();
@@ -50,19 +69,11 @@ namespace PlayerPreferences
             List<Player> players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToList();
             Shuffle(players);
 
-            Dictionary<Role, int> roleCounts = players.GroupBy(x => x.TeamRole.Role).ToDictionary(x => x.Key, x => x.Count());
+            Dictionary<Player, Role> assignedPlayers = AssignPlayers(players, players.GroupBy(x => x.TeamRole.Role).ToDictionary(x => x.Key, x => x.Count()));
 
-            foreach (Player player in players)
+            foreach (KeyValuePair<Player, Role> playerRole in assignedPlayers)
             {
-                foreach (Role role in Plugin.preferences[player.SteamId].Preferences)
-                {
-                    if (roleCounts.ContainsKey(role) && roleCounts[role] > 0)
-                    {
-                        roleCounts[role]--;
-                        player.ChangeRole(role);
-                        break;
-                    }
-                }
+                playerRole.Key.ChangeRole(playerRole.Value);
             }
         }
 
@@ -90,28 +101,19 @@ namespace PlayerPreferences
 
                 if (args.Length > 0)
                 {
-                    if (!int.TryParse(args[0], out int rank))
+                    if (args.Length > 1)
                     {
-                        if (args[0] == "help")
-                        {
-                            ev.ReturnMessage = "\n" +
-                                               "\"playerprefs\" - Gets all ranks with their corresponding roles\n" +
-                                               "\"playerprefs help\" - Shows you this page you big dumb.\n" +
-                                               $"\"playerprefs [role name] [rank]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
-                        }
-                        if (rank > Plugin.Roles.Count)
+                        if (!int.TryParse(args[0], out int rank) || rank > Plugin.Roles.Count)
                         {
                             ev.ReturnMessage = "\n" +
                                                "Invalid rank number.";
+                            return;
                         }
-                    }
-                    // Correct index (since menu starts at 1)
-                    rank = rank - 1;
+                        // Correct index (since menu starts at 1)
+                        rank = rank - 1;
 
-                    PlayerRecord record = Plugin.preferences[ev.Player.SteamId];
-
-                    if (args.Length > 1)
-                    {
+                        PlayerRecord record = Plugin.preferences[ev.Player.SteamId];
+                        
                         Role newRole = Plugin.GetRole(args[1]);
 
                         int curIndex = -1;
@@ -131,6 +133,13 @@ namespace PlayerPreferences
 
                         ev.ReturnMessage = "\n" +
                                            "Updated role rank.";
+                    }
+                    else if (args[0] == "help")
+                    {
+                        ev.ReturnMessage = "\n" +
+                                           "\"playerprefs\" - Gets all ranks with their corresponding roles\n" +
+                                           "\"playerprefs help\" - Shows you this page you big dumb.\n" +
+                                           $"\"playerprefs [rank] [role name]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
                     }
                 }
                 else
@@ -165,33 +174,44 @@ namespace PlayerPreferences
 
         public void OnTeamRespawn(TeamRespawnEvent ev)
         {
-            IEnumerable<Player> spectators = PluginManager.Manager.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR);
+            List<Player> spectators = PluginManager.Manager.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR).ToList();
+            Shuffle(spectators);
+            
+            Dictionary<Role, int> roleCounts = ev.SpawnChaos ?
+                new Dictionary<Role, int>
+                {
+                    {
+                        Role.CHAOS_INSURGENCY,
+                        ev.PlayerList.Count
+                    }
+                } :
+                new Dictionary<Role, int>
+                {
+                    {
+                        Role.NTF_COMMANDER,
+                        1
+                    },
+                    {
+                        Role.NTF_LIEUTENANT,
+                        Mathf.Min(3, ev.PlayerList.Count - 1)
+                    },
+                    {
+                        Role.NTF_CADET,
+                        Mathf.Max(0, ev.PlayerList.Count - 4)
+                    }
+                };
+            
+            Dictionary<Player, Role> newPlayers = AssignPlayers(spectators, roleCounts);
 
-            int count = ev.PlayerList.Count;
             if (ev.SpawnChaos)
             {
-                ev.PlayerList = RankByRole(spectators, Role.CHAOS_INSURGENCY).Take(count).ToList();
+                ev.PlayerList = newPlayers.Keys.ToList();
             }
             else
             {
-                Player[] spectatorArray = spectators.ToArray();
-
-                List<Player> commander = new List<Player>
-                {
-                    RankByRole(spectatorArray, Role.NTF_COMMANDER).First()
-                };
-                if (count > 1)
-                {
-                    IEnumerable<Player> otherSpawns = RankByRole(spectatorArray.Skip(1), Role.NTF_LIEUTENANT).Take(Mathf.Min(count - 1, 3));
-
-                    if (count > 4)
-                    {
-                        otherSpawns = otherSpawns.Concat(RankByRole(spectatorArray, Role.NTF_CADET)
-                            .Take(Mathf.Min(count - 4, 5)));
-                    }
-
-                    ev.PlayerList = commander.Concat(otherSpawns).ToList();
-                }
+                ev.PlayerList = newPlayers.Where(x => x.Value == Role.NTF_COMMANDER).Select(x => x.Key)
+                    .Concat(newPlayers.Where(x => x.Value == Role.NTF_LIEUTENANT).Select(x => x.Key))
+                    .Concat(newPlayers.Where(x => x.Value == Role.NTF_CADET).Select(x => x.Key)).ToList();
             }
         }
     }

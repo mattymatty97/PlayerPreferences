@@ -4,6 +4,7 @@ using scp4aiur;
 using Smod2.API;
 using Smod2.Attributes;
 using Smod2.Config;
+using Smod2.Events;
 using UnityEngine;
 
 namespace PlayerPreferences
@@ -107,7 +108,7 @@ namespace PlayerPreferences
             AddEventHandlers(new EventHandlers(this)
             {
                 CommandAliases = aliases
-            });
+            }, Priority.High);
             AddCommands(aliases, new PlayerPrefCommand());
         }
 

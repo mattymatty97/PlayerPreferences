@@ -42,24 +42,43 @@ namespace PlayerPreferences
             }
         }
 
-        private static Dictionary<Player, Role> AssignPlayers(IReadOnlyList<Player> players, IDictionary<Role, int> maxRoles)
+        public static void AssignPlayers(IDictionary<Player, Role> playerRoles)
         {
-            Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => Role.UNASSIGNED);
+            Player[] players = playerRoles.Keys.ToArray();
 
-            foreach (Player player in players)
+            bool swapped;
+            do
             {
-                foreach (Role role in Plugin.preferences[player.SteamId].Preferences)
+                swapped = false;
+
+                foreach (Player player in players)
                 {
-                    if (maxRoles.ContainsKey(role) && maxRoles[role] > 0)
+                    Role role = playerRoles[player];
+
+                    if (Plugin.preferences[player.SteamId].Preferences[0] != role)
                     {
-                        maxRoles[role]--;
-                        playerRoles[player] = role;
-                        break;
+                        foreach (Player otherPlayer in players)
+                        {
+                            if (player == otherPlayer || playerRoles[otherPlayer] == role)
+                                continue;
+
+                            Player newPlayer = RankByRole(new[]
+                            {
+                                player,
+                                otherPlayer
+                            }, role).First();
+                            if (player != newPlayer)
+                            {
+                                swapped = true;
+
+                                playerRoles[player] = playerRoles[otherPlayer];
+                                playerRoles[otherPlayer] = role;
+                                break;
+                            }
+                        }
                     }
                 }
-            }
-
-            return playerRoles;
+            } while (swapped);
         }
 
         public void OnRoundStart(RoundStartEvent ev)
@@ -69,9 +88,10 @@ namespace PlayerPreferences
             List<Player> players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToList();
             Shuffle(players);
 
-            Dictionary<Player, Role> assignedPlayers = AssignPlayers(players, players.GroupBy(x => x.TeamRole.Role).ToDictionary(x => x.Key, x => x.Count()));
+            Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
+            AssignPlayers(playerRoles);
 
-            foreach (KeyValuePair<Player, Role> playerRole in assignedPlayers)
+            foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {
                 playerRole.Key.ChangeRole(playerRole.Value);
             }
@@ -137,6 +157,7 @@ namespace PlayerPreferences
                     else if (args[0] == "help")
                     {
                         ev.ReturnMessage = "\n" +
+                                           "Player Preferences: Allows you to set your favorite roles so you have much higher chance of spawning as them." +
                                            "\"playerprefs\" - Gets all ranks with their corresponding roles\n" +
                                            "\"playerprefs help\" - Shows you this page you big dumb.\n" +
                                            $"\"playerprefs [rank] [role name]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
@@ -154,7 +175,7 @@ namespace PlayerPreferences
 
         private static IEnumerable<Player> RankByRole(IEnumerable<Player> players, Role role)
         {
-            return players.OrderByDescending(x =>
+            return players.OrderBy(x =>
             {
                 PlayerRecord record = Plugin.preferences[x.SteamId];
 
@@ -177,41 +198,33 @@ namespace PlayerPreferences
             List<Player> spectators = PluginManager.Manager.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR).ToList();
             Shuffle(spectators);
             
-            Dictionary<Role, int> roleCounts = ev.SpawnChaos ?
-                new Dictionary<Role, int>
+            Dictionary<Player, Role> players = ev.SpawnChaos ?
+                ev.PlayerList
+                    .Select(x => new KeyValuePair<Player, Role>(x, x.TeamRole.Role))
+                    .Concat(spectators.Except(ev.PlayerList).Select(x => new KeyValuePair<Player, Role>(x, Role.SPECTATOR)))
+                    .ToDictionary(x => x.Key, x => x.Value) : 
+                new Dictionary<Player, Role>
                 {
                     {
-                        Role.CHAOS_INSURGENCY,
-                        ev.PlayerList.Count
+                        ev.PlayerList[0],
+                        Role.NTF_COMMANDER
                     }
-                } :
-                new Dictionary<Role, int>
-                {
-                    {
-                        Role.NTF_COMMANDER,
-                        1
-                    },
-                    {
-                        Role.NTF_LIEUTENANT,
-                        Mathf.Min(3, ev.PlayerList.Count - 1)
-                    },
-                    {
-                        Role.NTF_CADET,
-                        Mathf.Max(0, ev.PlayerList.Count - 4)
-                    }
-                };
-            
-            Dictionary<Player, Role> newPlayers = AssignPlayers(spectators, roleCounts);
+                }
+                    .Concat(ev.PlayerList.Skip(1).Take(3).Select(x => new KeyValuePair<Player, Role>(x, Role.NTF_LIEUTENANT)))
+                    .Concat(ev.PlayerList.Skip(4).Select(x => new KeyValuePair<Player, Role>(x, Role.NTF_CADET)))
+                    .ToDictionary(x => x.Key, x => x.Value);
+
+            AssignPlayers(players);
 
             if (ev.SpawnChaos)
             {
-                ev.PlayerList = newPlayers.Keys.ToList();
+                ev.PlayerList = players.Keys.ToList();
             }
             else
             {
-                ev.PlayerList = newPlayers.Where(x => x.Value == Role.NTF_COMMANDER).Select(x => x.Key)
-                    .Concat(newPlayers.Where(x => x.Value == Role.NTF_LIEUTENANT).Select(x => x.Key))
-                    .Concat(newPlayers.Where(x => x.Value == Role.NTF_CADET).Select(x => x.Key)).ToList();
+                ev.PlayerList = players.Where(x => x.Value == Role.NTF_COMMANDER).Take(1).Select(x => x.Key)
+                    .Concat(players.Where(x => x.Value == Role.NTF_LIEUTENANT).Take(3).Select(x => x.Key))
+                    .Concat(players.Where(x => x.Value == Role.NTF_CADET).Select(x => x.Key)).ToList();
             }
         }
     }

@@ -73,19 +73,20 @@ namespace PlayerPreferences
             string content = File.ReadAllText(path);
             string[] strPreferences = content.Split(',');
             int[] intPreferences = new int[Plugin.Roles.Count];
+            int[] validRoles = Plugin.Roles.Select(x => (int)x.Value).ToArray();
 
-            for (int i = 0; i < strPreferences.Length; i++)
+            for (int i = 0; i < intPreferences.Length; i++)
             {
-                if (int.TryParse(strPreferences[i], out int preference))
+                if (i < strPreferences.Length && int.TryParse(strPreferences[i], out int preference) && validRoles.Contains(preference))
                 {
                     intPreferences[i] = preference + 1;
                 }
             }
 
             // Too many or not enough roles, or error while parsing string into int
-            if (strPreferences.Length != intPreferences.Length || intPreferences.Any(x => x == 0))
+            if (strPreferences.Length < intPreferences.Length || intPreferences.Any(x => x == 0))
             {
-                log?.Invoke($"Error while parsing preference file {SteamId}. Attempting to fix.");
+                log?.Invoke($"Error while parsing preference file {SteamId} (too little roles or invalid role numbers). Attempting to fix.");
                 for (int i = 0; i < intPreferences.Length; i++)
                 {
                     // Not set
@@ -96,7 +97,19 @@ namespace PlayerPreferences
                 }
             }
 
-            preferences = intPreferences.Select(x => (Role) (x - 1)).ToArray();
+            if (strPreferences.Length > intPreferences.Length)
+            {
+                log?.Invoke($"Error while parsing preference file {SteamId} (too many roles). Unable to fix, overwriting with random roles.");
+                Role[] myRoles = validRoles.Cast<Role>().ToArray();
+                Plugin.Shuffle(myRoles);
+
+                preferences = myRoles;
+                Write();
+            }
+            else
+            {
+                preferences = intPreferences.Select(x => (Role)(x - 1)).ToArray();
+            }
         }
 
         public void Write()

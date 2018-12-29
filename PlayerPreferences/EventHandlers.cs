@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 using Smod2;
 using Smod2.API;
 using Smod2.EventSystem.Events;
-using UnityEngine;
 
 namespace PlayerPreferences
 {
@@ -19,19 +18,6 @@ namespace PlayerPreferences
         public EventHandlers(Plugin plugin)
         {
             this.plugin = plugin;
-        }
-
-        private static void Shuffle<T>(IList<T> list)
-        {
-            int n = list.Count;
-            while (n > 1)
-            {
-                n--;
-                int k = Random.Range(0, n + 1);
-                T value = list[k];
-                list[k] = list[n];
-                list[n] = value;
-            }
         }
 
         public void OnPlayerJoin(PlayerJoinEvent ev)
@@ -131,8 +117,8 @@ namespace PlayerPreferences
         {
             plugin.RefreshConfig();
 
-            List<Player> players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToList();
-            Shuffle(players);
+            Player[] players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToArray();
+            Plugin.Shuffle(players);
 
             Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
             AssignPlayers(playerRoles);
@@ -223,10 +209,10 @@ namespace PlayerPreferences
                                 return;
                             }
 
-                            List<Role> myRoles = Plugin.Roles.Select(x => x.Value).ToList();
-                            Shuffle(myRoles);
+                            Role[] myRoles = Plugin.Roles.Select(x => x.Value).ToArray();
+                            Plugin.Shuffle(myRoles);
 
-                            Plugin.preferences.Add(ev.Player.SteamId, myRoles.ToArray());
+                            Plugin.preferences.Add(ev.Player.SteamId, myRoles);
 
                             ev.ReturnMessage = "\n" +
                                                "Created random role preferences. Use \".prefs delete\" to delete them.";
@@ -275,8 +261,8 @@ namespace PlayerPreferences
 
         public void OnTeamRespawn(TeamRespawnEvent ev)
         {
-            List<Player> spectators = PluginManager.Manager.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR).ToList();
-            Shuffle(spectators);
+            Player[] spectators = PluginManager.Manager.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR).ToArray();
+            Plugin.Shuffle(spectators);
             
             Dictionary<Player, Role> players = ev.SpawnChaos ?
                 ev.PlayerList

@@ -162,5 +162,31 @@ namespace PlayerPreferences
         {
             return Roles.Select(x => (x.Value, LevenshteinDistance(name, x.Key))).OrderBy(x => x.Item2).First().Item1;
         }
+
+        public static void Shuffle<T>(IList<T> list)
+        {
+            int n = list.Count;
+            while (n > 1)
+            {
+                n--;
+                int k = Random.Range(0, n + 1);
+                T value = list[k];
+                list[k] = list[n];
+                list[n] = value;
+            }
+        }
+
+        public static void Shuffle<T>(T[] array)
+        {
+            int n = array.Length;
+            while (n > 1)
+            {
+                n--;
+                int k = Random.Range(0, n + 1);
+                T value = array[k];
+                array[k] = array[n];
+                array[n] = value;
+            }
+        }
     }
 }

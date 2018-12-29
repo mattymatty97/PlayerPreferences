@@ -52,6 +52,22 @@ namespace PlayerPreferences
             }
         }
 
+        public int this[Role role]
+        {
+            get
+            {
+                for (int i = 0; i < preferences.Length; i++)
+                {
+                    if (preferences[i] == role)
+                    {
+                        return i;
+                    }
+                }
+
+                return -1;
+            }
+        }
+
         public void Read()
         {
             string content = File.ReadAllText(path);

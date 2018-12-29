@@ -54,23 +54,29 @@ namespace PlayerPreferences
                 foreach (Player player in players)
                 {
                     Role role = playerRoles[player];
+                    PlayerRecord record = Plugin.preferences[player.SteamId];
 
-                    if (Plugin.preferences[player.SteamId].Preferences[0] != role)
+                    // If player is not already satisfied with their role.
+                    if (record.Preferences[0] != role)
                     {
+                        // Check every player
                         foreach (Player otherPlayer in players)
                         {
+                            // Skip themselves or players of the same role.
                             if (player == otherPlayer || playerRoles[otherPlayer] == role)
                                 continue;
 
-                            Player newPlayer = RankByRole(new[]
+                            // Get role rankings.
+                            int playerRank = record[role];
+                            int otherRank = Plugin.preferences[otherPlayer.SteamId][role];
+
+                            // If other player has not set their preferences or if the player has a higher ranking than the other player.
+                            if (otherRank == -1 || playerRank < otherRank)
                             {
-                                player,
-                                otherPlayer
-                            }, role).First();
-                            if (player != newPlayer)
-                            {
+                                // Check again to see if anyone isn't satisfied.
                                 swapped = true;
 
+                                // Swap roles of the two players and move onto another primary player
                                 playerRoles[player] = playerRoles[otherPlayer];
                                 playerRoles[otherPlayer] = role;
                                 break;
@@ -177,19 +183,9 @@ namespace PlayerPreferences
         {
             return players.OrderBy(x =>
             {
-                PlayerRecord record = Plugin.preferences[x.SteamId];
+                int index = Plugin.preferences[x.SteamId][role];
 
-                int index = record.Preferences.Length;
-                for (int i = 0; i < record.Preferences.Length; i++)
-                {
-                    if (record[i] == role)
-                    {
-                        index = i;
-                        break;
-                    }
-                }
-
-                return index;
+                return index == -1 ? Plugin.Roles.Count : index;
             });
         }
 

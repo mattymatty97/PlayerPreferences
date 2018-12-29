@@ -236,7 +236,7 @@ namespace PlayerPreferences
             
             Dictionary<Player, Role> players = ev.SpawnChaos ?
                 ev.PlayerList
-                    .Select(x => new KeyValuePair<Player, Role>(x, x.TeamRole.Role))
+                    .Select(x => new KeyValuePair<Player, Role>(x, Role.CHAOS_INSURGENCY))
                     .Concat(spectators.Except(ev.PlayerList).Select(x => new KeyValuePair<Player, Role>(x, Role.SPECTATOR)))
                     .ToDictionary(x => x.Key, x => x.Value) : 
                 new Dictionary<Player, Role>
@@ -248,13 +248,14 @@ namespace PlayerPreferences
                 }
                     .Concat(ev.PlayerList.Skip(1).Take(3).Select(x => new KeyValuePair<Player, Role>(x, Role.NTF_LIEUTENANT)))
                     .Concat(ev.PlayerList.Skip(4).Select(x => new KeyValuePair<Player, Role>(x, Role.NTF_CADET)))
+                    .Concat(spectators.Except(ev.PlayerList).Select(x => new KeyValuePair<Player, Role>(x, Role.SPECTATOR)))
                     .ToDictionary(x => x.Key, x => x.Value);
 
             AssignPlayers(players);
 
             if (ev.SpawnChaos)
             {
-                ev.PlayerList = players.Keys.ToList();
+                ev.PlayerList = players.Where(x => x.Value == Role.CHAOS_INSURGENCY).Select(x => x.Key).ToList();
             }
             else
             {

@@ -121,7 +121,10 @@ namespace PlayerPreferences
             Plugin.Shuffle(players);
 
             Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
+
+            plugin.Info("Calculating optimal starting player roles...");
             AssignPlayers(playerRoles);
+            plugin.Info("Done!");
 
             foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {
@@ -281,7 +284,9 @@ namespace PlayerPreferences
                     .Concat(spectators.Except(ev.PlayerList).Select(x => new KeyValuePair<Player, Role>(x, Role.SPECTATOR)))
                     .ToDictionary(x => x.Key, x => x.Value);
 
+            plugin.Info("Calculating optimal team respawn roles...");
             AssignPlayers(players);
+            plugin.Info("Done!");
 
             if (ev.SpawnChaos)
             {

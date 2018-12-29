@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace PlayerPreferences
 {
-    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerRoundStart, IEventHandlerTeamRespawn
+    public class EventHandlers : IEventHandlerCallCommand, IEventHandlerRoundStart, IEventHandlerTeamRespawn
     {
         private readonly Plugin plugin;
 
@@ -19,14 +19,6 @@ namespace PlayerPreferences
         public EventHandlers(Plugin plugin)
         {
             this.plugin = plugin;
-        }
-
-        public void OnPlayerJoin(PlayerJoinEvent ev)
-        {
-            if (!Plugin.preferences.Contains(ev.Player.SteamId))
-            {
-                Plugin.preferences.Add(ev.Player.SteamId, Plugin.Roles.Select(x => x.Value).ToArray());
-            }
         }
 
         private static void Shuffle<T>(IList<T> list)
@@ -163,6 +155,14 @@ namespace PlayerPreferences
                     {
                         args[i - 1] = collection[i].Value;
                     }
+                }
+
+                if (!Plugin.preferences.Contains(ev.Player.SteamId))
+                {
+                    List<Role> myRoles = Plugin.Roles.Select(x => x.Value).ToList();
+                    Shuffle(myRoles);
+
+                    Plugin.preferences.Add(ev.Player.SteamId, myRoles.ToArray());
                 }
 
                 if (args.Length > 0)

@@ -42,49 +42,89 @@ namespace PlayerPreferences
             }
         }
 
-        public static void AssignPlayers(IDictionary<Player, Role> playerRoles)
+        private class PlayerSortData
         {
-            Player[] players = playerRoles.Keys.ToArray();
+            public Player Player { get; }
+            private Role role;
+            public Role Role
+            {
+                get => role;
+                set
+                {
+                    Rank = Record?[role] ?? -1;
+
+                    role = value;
+                }
+            }
+
+            public PlayerRecord Record { get; }
+            public int Rank { get; private set; }
+
+            public PlayerSortData(Player player, Role role)
+            {
+                Player = player;
+                Record = Plugin.preferences.Contains(player.SteamId) ? Plugin.preferences[player.SteamId] : null;
+
+                Role = role;
+            }
+
+            public bool ShouldSwap(PlayerSortData other)
+            {
+                int newThisRank = Record[other.Role];
+
+                if (other.Record == null)
+                {
+                    return newThisRank < Rank;
+                }
+
+                int newOtherRank = other.Record[Role];
+                return (newThisRank + newOtherRank) < (Rank + other.Rank);
+            }
+
+            public void Swap(PlayerSortData other)
+            {
+                Role thisRole = Role;
+                Role = other.Role;
+                other.Role = thisRole;
+            }
+        }
+
+        private void AssignPlayers(IDictionary<Player, Role> playerRoles)
+        {
+            PlayerSortData[] players = playerRoles.Keys.Select(x => new PlayerSortData(x, playerRoles[x])).ToArray();
+            PlayerSortData[] recordPlayers = players.Where(x => x.Record != null).ToArray();
 
             bool swapped;
             do
             {
                 swapped = false;
 
-                foreach (Player player in players)
+                foreach (PlayerSortData player in recordPlayers)
                 {
-                    Role role = playerRoles[player];
-                    PlayerRecord record = Plugin.preferences[player.SteamId];
-
                     // If player is not already satisfied with their role.
-                    if (record.Preferences[0] != role)
+                    if (player.Rank > 0)
                     {
-                        // Check every player
-                        foreach (Player otherPlayer in players)
+                        // Find a player that is not of the same rank and willing to swap for role of current player
+                        PlayerSortData match = players.FirstOrDefault(x => x.Role != player.Role && player.ShouldSwap(x));
+
+                        // If the player exists, swap the current player and the match's roles
+                        if (match != null)
                         {
-                            // Skip themselves or players of the same role.
-                            if (player == otherPlayer || playerRoles[otherPlayer] == role)
-                                continue;
+                            player.Swap(match);
 
-                            // Get role rankings.
-                            int playerRank = record[role];
-                            int otherRank = Plugin.preferences[otherPlayer.SteamId][role];
-
-                            // If other player has not set their preferences or if the player has a higher ranking than the other player.
-                            if (otherRank == -1 || playerRank < otherRank)
-                            {
-                                // Check again to see if anyone isn't satisfied.
-                                swapped = true;
-
-                                // Swap roles of the two players and move onto another primary player
-                                playerRoles[player] = playerRoles[otherPlayer];
-                                playerRoles[otherPlayer] = role;
-                                break;
-                            }
+                            // Register the swap to see if the match would now like to swap with anyone else
+                            swapped = true;
                         }
                     }
                 }
             } while (swapped);
+
+            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? recordPlayers.Average(x => 1 - x.Rank / 15).ToString() : "1 (no preferences set)")}");
+
+            foreach (PlayerSortData player in players)
+            {
+                playerRoles[player.Player] = player.Role;
+            }
         }
 
         public void OnRoundStart(RoundStartEvent ev)

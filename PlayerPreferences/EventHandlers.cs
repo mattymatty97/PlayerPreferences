@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace PlayerPreferences
 {
-    public class EventHandlers : IEventHandlerCallCommand, IEventHandlerRoundStart, IEventHandlerTeamRespawn
+    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerRoundStart, IEventHandlerTeamRespawn
     {
         private readonly Plugin plugin;
 
@@ -31,6 +31,14 @@ namespace PlayerPreferences
                 T value = list[k];
                 list[k] = list[n];
                 list[n] = value;
+            }
+        }
+
+        public void OnPlayerJoin(PlayerJoinEvent ev)
+        {
+            if (ev.Player.DoNotTrack && Plugin.preferences.Contains(ev.Player.SteamId))
+            {
+                Plugin.preferences.Remove(ev.Player.SteamId);
             }
         }
 
@@ -157,14 +165,6 @@ namespace PlayerPreferences
                     }
                 }
 
-                if (!Plugin.preferences.Contains(ev.Player.SteamId))
-                {
-                    List<Role> myRoles = Plugin.Roles.Select(x => x.Value).ToList();
-                    Shuffle(myRoles);
-
-                    Plugin.preferences.Add(ev.Player.SteamId, myRoles.ToArray());
-                }
-
                 if (args.Length > 0)
                 {
                     if (args.Length > 1)
@@ -203,10 +203,54 @@ namespace PlayerPreferences
                     else if (args[0] == "help")
                     {
                         ev.ReturnMessage = "\n" +
-                                           "Player Preferences: Allows you to set your favorite roles so you have much higher chance of spawning as them." +
-                                           "\"playerprefs\" - Gets all ranks with their corresponding roles\n" +
-                                           "\"playerprefs help\" - Shows you this page you big dumb.\n" +
-                                           $"\"playerprefs [rank] [role name]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
+                                           "What these commands do: give you a much higher chance of being that role when you spawn in when round starts or during MTF/Chaos spawns.\n" +
+                                           "\n" +
+                                           "\".prefs create\" - Generates random role preferences and allows you to use preference commands.\n" +
+                                           "\".prefs delete\" - Deletes all role preference data associated with your account.\n" +
+                                           "\".prefs help\" - Shows you this page you big dumb.\n" +
+                                           "\".prefs\" - Gets all ranks with their corresponding roles\n" +
+                                          $"\".prefs [rank] [role name]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
+                    }
+                    else if (args[0] == "create")
+                    {
+                        if (!Plugin.preferences.Contains(ev.Player.SteamId))
+                        {
+                            if (ev.Player.DoNotTrack)
+                            {
+                                ev.ReturnMessage = "\n" +
+                                                   "Looks like you've got \"do not track\" enabled. If you want to use role preferences, please disable do not track.";
+
+                                return;
+                            }
+
+                            List<Role> myRoles = Plugin.Roles.Select(x => x.Value).ToList();
+                            Shuffle(myRoles);
+
+                            Plugin.preferences.Add(ev.Player.SteamId, myRoles.ToArray());
+
+                            ev.ReturnMessage = "\n" +
+                                               "Created random role preferences. Use \".prefs delete\" to delete them.";
+                        }
+                        else
+                        {
+                            ev.ReturnMessage = "\n" +
+                                               "You already have role preferences. Use \".prefs delete\" to delete them.";
+                        }
+                    }
+                    else if (args[0] == "delete")
+                    {
+                        if (Plugin.preferences.Contains(ev.Player.SteamId))
+                        {
+                            Plugin.preferences.Remove(ev.Player.SteamId);
+
+                            ev.ReturnMessage = "\n" +
+                                           "Deleted role preferences. Run \".prefs create\" command to regenerate your preferences and use role preferences again.";
+                        }
+                        else
+                        {
+                            ev.ReturnMessage = "\n" +
+                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                        }
                     }
                 }
                 else
@@ -214,7 +258,7 @@ namespace PlayerPreferences
                     int i = 1;
                     ev.ReturnMessage = "\n" +
                                        $"{string.Join("\n", Plugin.preferences[ev.Player.SteamId].Preferences.Select(x => $"{i++} - {Plugin.RoleNames[x]}"))}\n" +
-                                       "Use \"help\" as an argument for additional command info.";
+                                       "Use \".prefs help\" for additional command info.";
                 }
             }
         }

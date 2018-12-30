@@ -111,6 +111,13 @@ namespace PlayerPreferences
                 {
                     if (args.Length > 1)
                     {
+                        if (!Plugin.preferences.Contains(ev.Player.SteamId))
+                        {
+                            ev.ReturnMessage = "\n" +
+                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                            return;
+                        }
+
                         if (!int.TryParse(args[0], out int rank) || rank > Plugin.Roles.Count)
                         {
                             ev.ReturnMessage = "\n" +
@@ -141,22 +148,23 @@ namespace PlayerPreferences
 
                         ev.ReturnMessage = "\n" +
                                            "Updated role rank.";
+                        return;
                     }
-                    else if (args[0] == "help")
+
+                    switch (args[0])
                     {
-                        ev.ReturnMessage = "\n" +
-                                           "What these commands do: give you a much higher chance of being that role when you spawn in when round starts or during MTF/Chaos spawns.\n" +
-                                           "\n" +
-                                           "\".prefs create\" - Generates random role preferences and allows you to use preference commands.\n" +
-                                           "\".prefs delete\" - Deletes all role preference data associated with your account.\n" +
-                                           "\".prefs help\" - Shows you this page you big dumb.\n" +
-                                           "\".prefs\" - Gets all ranks with their corresponding roles\n" +
-                                          $"\".prefs [rank] [role name]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
-                    }
-                    else if (args[0] == "create")
-                    {
-                        if (!Plugin.preferences.Contains(ev.Player.SteamId))
-                        {
+                        case "help":
+                            ev.ReturnMessage = "\n" +
+                                               "What these commands do: give you a much higher chance of being that role when you spawn in when round starts or during MTF/Chaos spawns.\n" +
+                                               "\n" +
+                                               "\".prefs create\" - Generates random role preferences and allows you to use preference commands.\n" +
+                                               "\".prefs delete\" - Deletes all role preference data associated with your account.\n" +
+                                               "\".prefs help\" - Shows you this page you big dumb.\n" +
+                                               "\".prefs\" - Gets all ranks with their corresponding roles\n" +
+                                               $"\".prefs [rank] [role name]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
+                            return;
+
+                        case "create" when !Plugin.preferences.Contains(ev.Player.SteamId): {
                             if (ev.Player.DoNotTrack)
                             {
                                 ev.ReturnMessage = "\n" +
@@ -172,36 +180,50 @@ namespace PlayerPreferences
 
                             ev.ReturnMessage = "\n" +
                                                "Created random role preferences. Use \".prefs delete\" to delete them.";
+                            return;
                         }
-                        else
-                        {
+
+                        case "create":
                             ev.ReturnMessage = "\n" +
                                                "You already have role preferences. Use \".prefs delete\" to delete them.";
-                        }
-                    }
-                    else if (args[0] == "delete")
-                    {
-                        if (Plugin.preferences.Contains(ev.Player.SteamId))
-                        {
+                            return;
+
+                        case "delete" when !Plugin.preferences.Contains(ev.Player.SteamId):
+                            ev.ReturnMessage = "\n" +
+                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                            return;
+
+                        case "delete":
                             Plugin.preferences.Remove(ev.Player.SteamId);
 
                             ev.ReturnMessage = "\n" +
-                                           "Deleted role preferences. Run \".prefs create\" command to regenerate your preferences and use role preferences again.";
-                        }
-                        else
-                        {
+                                               "Deleted role preferences. Run \".prefs create\" command to regenerate your preferences and use role preferences again.";
+                            return;
+
+                        case "default":
                             ev.ReturnMessage = "\n" +
-                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
-                        }
+                                               "Invalid argument. Please run \".prefs help\" for a full list of commands.";
+                            return;
                     }
                 }
                 else
                 {
-                    int i = 1;
+                    if (Plugin.preferences.Contains(ev.Player.SteamId))
+                    {
+                        int i = 1;
+                        ev.ReturnMessage = "\n" +
+                                           $"{string.Join("\n", Plugin.preferences[ev.Player.SteamId].Preferences.Select(x => $"{i++} - {Plugin.RoleNames[x]}"))}\n" +
+                                           "Use \".prefs help\" for additional command info.";
+                        return;
+                    }
+
                     ev.ReturnMessage = "\n" +
-                                       $"{string.Join("\n", Plugin.preferences[ev.Player.SteamId].Preferences.Select(x => $"{i++} - {Plugin.RoleNames[x]}"))}\n" +
-                                       "Use \".prefs help\" for additional command info.";
+                                       "You have not created your preferences yet. To do so, use \".prefs create\"";
+                    return;
                 }
+
+                ev.ReturnMessage = "\n" +
+                                   "Error processing preferences command.";
             }
         }
 

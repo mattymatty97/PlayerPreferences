@@ -28,53 +28,6 @@ namespace PlayerPreferences
             }
         }
 
-        private class PlayerSortData
-        {
-            public Player Player { get; }
-            private Role role;
-            public Role Role
-            {
-                get => role;
-                set
-                {
-                    Rank = Record?[role] ?? -1;
-
-                    role = value;
-                }
-            }
-
-            public PlayerRecord Record { get; }
-            public int Rank { get; private set; }
-
-            public PlayerSortData(Player player, Role role)
-            {
-                Player = player;
-                Record = Plugin.preferences.Contains(player.SteamId) ? Plugin.preferences[player.SteamId] : null;
-
-                Role = role;
-            }
-
-            public bool ShouldSwap(PlayerSortData other)
-            {
-                int newThisRank = Record[other.Role];
-
-                if (other.Record == null)
-                {
-                    return newThisRank < Rank;
-                }
-
-                int newOtherRank = other.Record[Role];
-                return (newThisRank + newOtherRank) < (Rank + other.Rank);
-            }
-
-            public void Swap(PlayerSortData other)
-            {
-                Role thisRole = Role;
-                Role = other.Role;
-                other.Role = thisRole;
-            }
-        }
-
         private void AssignPlayers(IDictionary<Player, Role> playerRoles)
         {
             PlayerSortData[] players = playerRoles.Keys.Select(x => new PlayerSortData(x, playerRoles[x])).ToArray();
@@ -105,7 +58,7 @@ namespace PlayerPreferences
                 }
             } while (swapped);
 
-            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? recordPlayers.Average(x => 1 - x.Rank / 15).ToString() : "1 (no preferences set)")}");
+            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? recordPlayers.Average(x => 1 - (float)x.Rank / 15).ToString() : "1 (no preferences set)")}");
 
             foreach (PlayerSortData player in players)
             {

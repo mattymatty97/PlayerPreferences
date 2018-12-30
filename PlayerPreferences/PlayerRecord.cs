@@ -10,10 +10,11 @@ namespace PlayerPreferences
         private readonly string path;
         private readonly Action<string> log;
         
-        public string SteamId { get; private set; }
+        public string SteamId { get; }
         
         public PlayerRecord(string path, string steamId, Action<string> log)
         {
+            SteamId = steamId;
             this.path = path;
             this.log = log;
         }

@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using scp4aiur;
 using Smod2.API;
 using Smod2.Attributes;
 using Smod2.Config;
@@ -38,10 +37,6 @@ namespace PlayerPreferences
             {
                 "mtf.cadet",
                 Role.NTF_CADET
-            },
-            {
-                "mtf.scientist",
-                Role.NTF_SCIENTIST
             },
             {
                 "mtf.lieutenant",
@@ -92,14 +87,12 @@ namespace PlayerPreferences
         public override void Register()
         {
             RoleNames = Roles.ToDictionary(x => x.Value, x => x.Key);
-
-            Timing.Init(this);
+            
             preferences = new Preferences("PlayerPrefs", Info);
 
             AddConfig(new ConfigSetting("playerprefs_rank", new[] {"owner"}, SettingType.LIST, true, "Ranks allowed to adjust player preferences."));
             AddConfig(new ConfigSetting("playerprefs_aliases", new[]
             {
-                "pp",
                 "prefs",
                 "playerprefs"
             }, SettingType.LIST, true, "Client console commands that can be used to run the Player Preferences."));

@@ -23,7 +23,7 @@ Note: to use client commands, prefix them by a dot. E.g: `.prefs`.
 | :-------: | :--------: | :---------- |
 | rank number | Integer | The rank of a role, shown by the number on the left side of the `prefs` list. |
 | role name | String | The name of a role, shown by the text on the right side of the `prefs` list. |
-| selector | String / Integer | The filter when using an RA command. Can be wildcard (`*`) to select all, or to select one a player ID or SteamID can be used. |
+| selector | String / Integer | The filter when using an RA command. Can be wildcard (`*`) to select all players, or to select one player a player ID or SteamID can be used. |
 
 # Configs
 

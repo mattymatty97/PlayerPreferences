@@ -34,7 +34,9 @@ namespace PlayerPreferences
         public void Remove(string steamId)
         {
             if (!records.ContainsKey(steamId))
+            {
                 return;
+            }
 
             records[steamId].Delete();
             records.Remove(steamId);

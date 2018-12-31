@@ -71,6 +71,17 @@ namespace PlayerPreferences
                         "Successfully reloaded preferences."
                     };
 
+                case "delete":
+                    foreach (string steamId in players.Select(x => x.SteamId))
+                    {
+                        Plugin.preferences.Remove(steamId);
+                    }
+
+                    return new[]
+                    {
+                        "Successfully deleted preferences"
+                    };
+
                 default:
                     return new[]
                     {

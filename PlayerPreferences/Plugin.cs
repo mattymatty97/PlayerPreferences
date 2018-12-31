@@ -16,7 +16,7 @@ namespace PlayerPreferences
         SmodMajor = 3,
         SmodMinor = 2,
         SmodRevision = 0,
-        version = "1.0.0"
+        version = "1.0.1"
             )]
     public class Plugin : Smod2.Plugin
     {

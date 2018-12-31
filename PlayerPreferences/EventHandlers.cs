@@ -120,6 +120,13 @@ namespace PlayerPreferences
                                 return;
 
                             case "hash":
+                                if (ev.Player.DoNotTrack)
+                                {
+                                    ev.ReturnMessage = "\n" +
+                                                       "Looks like you've got \"do not track\" enabled. If you want to use role preferences, please disable do not track.";
+                                    return;
+                                }
+
                                 char[] cRoles = args[1].ToCharArray();
                                 bool invalid = false;
 
@@ -223,7 +230,6 @@ namespace PlayerPreferences
                             {
                                 ev.ReturnMessage = "\n" +
                                                    "Looks like you've got \"do not track\" enabled. If you want to use role preferences, please disable do not track.";
-
                                 return;
                             }
 

@@ -16,10 +16,22 @@ namespace PlayerPreferences
 
             if (!int.TryParse(arg, out int playerId))
             {
-                return null;
+                if (!long.TryParse(arg, out long steamId))
+                {
+                    return null;
+                }
+
+                string steamIdStr = steamId.ToString();
+                return new[]
+                {
+                    PluginManager.Manager.Server.GetPlayers().FirstOrDefault(x => x.SteamId == steamIdStr)
+                };
             }
 
-            return PluginManager.Manager.Server.GetPlayers().Where(x => x.PlayerId == playerId).ToArray();
+            return new[]
+            {
+                PluginManager.Manager.Server.GetPlayers().FirstOrDefault(x => x.PlayerId == playerId)
+            };
         }
 
         public string[] OnCall(ICommandSender sender, string[] args)
@@ -46,7 +58,7 @@ namespace PlayerPreferences
             {
                 return new[]
                 {
-                    "Invalid player selector. Please specify a player ID or use a wildcard (*) for all players."
+                    "Invalid player selector. Please specify a player ID, a SteamID, or use a wildcard (*) for all players."
                 };
             }
 

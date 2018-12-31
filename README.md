@@ -7,6 +7,8 @@ Allows players to rank their favorite roles in order to be more likely to spawn 
 Place the `PlayerPreferences.dll` file in your sm_plugins folder.
 
 # Commands
+Note: to use client commands, prefix them by a dot. E.g: `.prefs`.
+
 | Command | Console | Description |
 | :-----: | :-----: | :---------- |
 | prefs | Client | Lists rank number and corresponding role name. |

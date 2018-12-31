@@ -29,5 +29,5 @@ Note: to use client commands, prefix them by a dot. E.g: `.prefs`.
 
 | Config | Value Type | Default | Description |
 | :----: | :--------: | :-----: |:----------- |
-| playerprefs_rank | String List | owner | Ranks allowed to run the RA commands. |
-| playerprefs_aliases | String List | prefs, playerprefs | Aliases for all Player Preferences commands (server, RA, and client console). |
+| prefs_rank | String List | owner | Ranks allowed to run the RA commands. |
+| prefs_aliases | String List | prefs, playerprefs | Aliases for all Player Preferences commands (server, RA, and client console). |

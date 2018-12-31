@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Smod2.EventHandlers;
 using Smod2.Events;
@@ -111,57 +112,110 @@ namespace PlayerPreferences
                 {
                     if (args.Length > 1)
                     {
-                        if (!Plugin.preferences.Contains(ev.Player.SteamId))
+                        switch (args[0])
                         {
-                            ev.ReturnMessage = "\n" +
-                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
-                            return;
+                            case "hash" when args[1].Length != Plugin.Roles.Count:
+                                ev.ReturnMessage = "\n" +
+                                                   "Invalid hash length. Are you sure thats the full hash? Is the hash from an outdated server?";
+                                return;
+
+                            case "hash":
+                                char[] cRoles = args[1].ToCharArray();
+                                bool invalid = false;
+
+                                Role[] roles = cRoles.Select(x =>
+                                {
+                                    if (!int.TryParse(x.ToString(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int roleInt))
+                                    {
+                                        invalid = true;
+                                        return Role.UNASSIGNED;
+                                    }
+                                    
+                                    if (!Plugin.IntToRole.ContainsKey(roleInt))
+                                    {
+                                        invalid = true;
+                                        return Role.UNASSIGNED;
+                                    }
+
+                                    return Plugin.IntToRole[roleInt];
+                                }).ToArray();
+
+                                if (invalid || roles.Length != roles.Distinct().Count())
+                                {
+                                    ev.ReturnMessage = "\n" +
+                                                       "Invalid hash. Is the hash from an outdated server?";
+                                    return;
+                                }
+
+                                if (Plugin.preferences.Contains(ev.Player.SteamId))
+                                {
+                                    Plugin.preferences[ev.Player.SteamId].Preferences = roles;
+                                    ev.ReturnMessage = "\n" +
+                                                       "Preferences set.";
+                                }
+                                else
+                                {
+                                    Plugin.preferences.Add(ev.Player.SteamId, roles);
+                                    ev.ReturnMessage = "\n" +
+                                                       "Preferences created and set.";
+                                }
+                                return;
+
+                            default:
+                                if (!Plugin.preferences.Contains(ev.Player.SteamId))
+                                {
+                                    ev.ReturnMessage = "\n" +
+                                                       "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                                    return;
+                                }
+
+                                if (!int.TryParse(args[0], out int rank) || rank > Plugin.Roles.Count)
+                                {
+                                    ev.ReturnMessage = "\n" +
+                                                       "Invalid rank number.";
+                                    return;
+                                }
+                                // Correct index (since menu starts at 1)
+                                rank = rank - 1;
+
+                                PlayerRecord record = Plugin.preferences[ev.Player.SteamId];
+
+                                Role newRole = Plugin.GetRole(args[1]);
+
+                                int curIndex = -1;
+                                for (int i = 0; i < record.Preferences.Length; i++)
+                                {
+                                    if (record.Preferences[i] == newRole)
+                                    {
+                                        curIndex = i;
+                                        break;
+                                    }
+                                }
+
+                                Role existingRole = record[rank];
+
+                                record[rank] = newRole;
+                                record[curIndex] = existingRole;
+
+                                ev.ReturnMessage = "\n" +
+                                                   $"Updated role rank of {Plugin.RoleNames[newRole]} to {rank + 1} and moved {Plugin.RoleNames[existingRole]} to {curIndex + 1}.";
+                                return;
                         }
-
-                        if (!int.TryParse(args[0], out int rank) || rank > Plugin.Roles.Count)
-                        {
-                            ev.ReturnMessage = "\n" +
-                                               "Invalid rank number.";
-                            return;
-                        }
-                        // Correct index (since menu starts at 1)
-                        rank = rank - 1;
-
-                        PlayerRecord record = Plugin.preferences[ev.Player.SteamId];
-                        
-                        Role newRole = Plugin.GetRole(args[1]);
-
-                        int curIndex = -1;
-                        for (int i = 0; i < record.Preferences.Length; i++)
-                        {
-                            if (record.Preferences[i] == newRole)
-                            {
-                                curIndex = i;
-                                break;
-                            }
-                        }
-
-                        Role existingRole = record[rank];
-
-                        record[rank] = newRole;
-                        record[curIndex] = existingRole;
-
-                        ev.ReturnMessage = "\n" +
-                                           "Updated role rank.";
-                        return;
                     }
 
                     switch (args[0])
                     {
                         case "help":
                             ev.ReturnMessage = "\n" +
-                                               "What these commands do: give you a much higher chance of being that role when you spawn in when round starts or during MTF/Chaos spawns.\n" +
+                                               " // Player Preferences by Androx //\n" +
                                                "\n" +
-                                               "\".prefs create\" - Generates random role preferences and allows you to use preference commands.\n" +
-                                               "\".prefs delete\" - Deletes all role preference data associated with your account.\n" +
-                                               "\".prefs help\" - Shows you this page you big dumb.\n" +
-                                               "\".prefs\" - Gets all ranks with their corresponding roles\n" +
-                                               $"\".prefs [rank] [role name]\", with rank as 1 (highest) to {Plugin.Roles.Count} - Sets the priority of making you that role.";
+                                               ".prefs                  - Gets all ranks with their corresponding roles.\n" +
+                                               ".prefs help             - Shows you this page you big dumb.\n" +
+                                               ".prefs create           - Generates preferences and unlocks commands.\n" +
+                                               ".prefs delete           - Deletes preference data on with your account.\n" +
+                                               ".prefs [#] [role]       - Sets role respawn priority (1 is the highest).\n" +
+                                               ".prefs hash             - Gives hash of current preferences.\n" +
+                                               ".prefs hash [role hash] - Sets preferences to the specified hash.";
                             return;
 
                         case "create" when !Plugin.preferences.Contains(ev.Player.SteamId): {
@@ -198,6 +252,16 @@ namespace PlayerPreferences
 
                             ev.ReturnMessage = "\n" +
                                                "Deleted role preferences. Run \".prefs create\" command to regenerate your preferences and use role preferences again.";
+                            return;
+
+                        case "hash" when !Plugin.preferences.Contains(ev.Player.SteamId):
+                            ev.ReturnMessage = "\n" +
+                                               "You have no role preferences. If you mean to set your preferences with a hash, please use \".prefs hash [generated hash]\" instead.";
+                            return;
+
+                        case "hash":
+                            ev.ReturnMessage = "\n" +
+                                               $"Your role preferences hash: {string.Join("", Plugin.preferences[ev.Player.SteamId].Preferences.Select(x => Plugin.RoleToInt[x].ToString("X"))).ToLower()}";
                             return;
 
                         default:

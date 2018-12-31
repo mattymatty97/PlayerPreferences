@@ -81,13 +81,20 @@ namespace PlayerPreferences
         };
         public static Dictionary<Role, string> RoleNames { get; private set; }
 
+        public static Dictionary<Role, int> RoleToInt { get; private set; }
+        public static Dictionary<int, Role> IntToRole { get; private set; }
+
         internal static Preferences preferences;
         internal static string[] ranks;
 
         public override void Register()
         {
             RoleNames = Roles.ToDictionary(x => x.Value, x => x.Key);
-            
+
+            int i = 0;
+            RoleToInt = Roles.ToDictionary(x => x.Value, x => i++);
+            IntToRole = RoleToInt.ToDictionary(x => x.Value, x => x.Key);
+
             preferences = new Preferences("PlayerPrefs", Info);
 
             AddConfig(new ConfigSetting("prefs_rank", new[] {"owner"}, SettingType.LIST, true, "Ranks allowed to adjust player preferences."));
@@ -153,7 +160,10 @@ namespace PlayerPreferences
 
         public static Role GetRole(string name)
         {
-            return Roles.Select(x => (x.Value, LevenshteinDistance(name, x.Key))).OrderBy(x => x.Item2).First().Item1;
+            return Roles
+                .Select(x => (role: x.Value, distance: LevenshteinDistance(name, x.Key)))
+                .OrderBy(x => x.Item2).First()
+                .role;
         }
 
         public static void Shuffle<T>(IList<T> list)

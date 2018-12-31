@@ -200,30 +200,24 @@ namespace PlayerPreferences
                                                "Deleted role preferences. Run \".prefs create\" command to regenerate your preferences and use role preferences again.";
                             return;
 
-                        case "default":
+                        default:
                             ev.ReturnMessage = "\n" +
                                                "Invalid argument. Please run \".prefs help\" for a full list of commands.";
                             return;
                     }
                 }
-                else
-                {
-                    if (Plugin.preferences.Contains(ev.Player.SteamId))
-                    {
-                        int i = 1;
-                        ev.ReturnMessage = "\n" +
-                                           $"{string.Join("\n", Plugin.preferences[ev.Player.SteamId].Preferences.Select(x => $"{i++} - {Plugin.RoleNames[x]}"))}\n" +
-                                           "Use \".prefs help\" for additional command info.";
-                        return;
-                    }
 
+                if (Plugin.preferences.Contains(ev.Player.SteamId))
+                {
+                    int i = 1;
                     ev.ReturnMessage = "\n" +
-                                       "You have not created your preferences yet. To do so, use \".prefs create\"";
+                                       $"{string.Join("\n", Plugin.preferences[ev.Player.SteamId].Preferences.Select(x => $"{i++} - {Plugin.RoleNames[x]}"))}\n" +
+                                       "Use \".prefs help\" for additional command info.";
                     return;
                 }
 
                 ev.ReturnMessage = "\n" +
-                                   "Error processing preferences command.";
+                                   "You have not created your preferences yet. To do so, use \".prefs create\"";
             }
         }
 

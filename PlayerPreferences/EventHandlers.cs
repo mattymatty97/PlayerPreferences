@@ -209,13 +209,13 @@ namespace PlayerPreferences
                             ev.ReturnMessage = "\n" +
                                                " // Player Preferences by Androx //\n" +
                                                "\n" +
-                                               ".prefs                  - Gets all ranks with their corresponding roles.\n" +
-                                               ".prefs help             - Shows you this page you big dumb.\n" +
-                                               ".prefs create           - Generates preferences and unlocks commands.\n" +
-                                               ".prefs delete           - Deletes preference data on with your account.\n" +
-                                               ".prefs [#] [role]       - Sets role respawn priority (1 is the highest).\n" +
-                                               ".prefs hash             - Gives hash of current preferences.\n" +
-                                               ".prefs hash [role hash] - Sets preferences to the specified hash.";
+                                               ".prefs             - Gets all ranks with their corresponding roles.\n" +
+                                               ".prefs help        - Shows you this page you big dumb.\n" +
+                                               ".prefs create      - Generates preferences and unlocks commands.\n" +
+                                               ".prefs delete      - Deletes preference data on with your account.\n" +
+                                               ".prefs [#] [role]  - Sets role respawn priority (1 is the highest).\n" +
+                                               ".prefs hash        - Gives hash of current preferences.\n" +
+                                               ".prefs hash [hash] - Sets preferences to the specified hash.";
                             return;
 
                         case "create" when !Plugin.preferences.Contains(ev.Player.SteamId): {

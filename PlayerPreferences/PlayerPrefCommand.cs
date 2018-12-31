@@ -7,7 +7,7 @@ namespace PlayerPreferences
 {
     public class PlayerPrefCommand : ICommandHandler
     {
-        private Player[] GetPlayers(string arg)
+        private static Player[] GetPlayers(string arg)
         {
             if (arg == "*")
             {
@@ -69,18 +69,6 @@ namespace PlayerPreferences
                     return new[]
                     {
                         "Successfully reloaded preferences."
-                    };
-
-                case "default":
-                    Role[] defaultRoles = Plugin.Roles.Select(x => x.Value).ToArray();
-                    foreach (string steamId in players.Select(x => x.SteamId))
-                    {
-                        Plugin.preferences[steamId].Preferences = defaultRoles;
-                    }
-
-                    return new[]
-                    {
-                        "Successfully set preferences to default."
                     };
 
                 default:

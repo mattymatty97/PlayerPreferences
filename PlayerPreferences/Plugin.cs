@@ -90,14 +90,14 @@ namespace PlayerPreferences
             
             preferences = new Preferences("PlayerPrefs", Info);
 
-            AddConfig(new ConfigSetting("playerprefs_rank", new[] {"owner"}, SettingType.LIST, true, "Ranks allowed to adjust player preferences."));
-            AddConfig(new ConfigSetting("playerprefs_aliases", new[]
+            AddConfig(new ConfigSetting("prefs_rank", new[] {"owner"}, SettingType.LIST, true, "Ranks allowed to adjust player preferences."));
+            AddConfig(new ConfigSetting("prefs_aliases", new[]
             {
                 "prefs",
                 "playerprefs"
             }, SettingType.LIST, true, "Client console commands that can be used to run the Player Preferences."));
 
-            string[] aliases = GetConfigList("playerprefs_aliases");
+            string[] aliases = GetConfigList("prefs_aliases");
             AddEventHandlers(new EventHandlers(this)
             {
                 CommandAliases = aliases
@@ -107,7 +107,7 @@ namespace PlayerPreferences
 
         public void RefreshConfig()
         {
-            ranks = GetConfigList("playerprefs_rank");
+            ranks = GetConfigList("prefs_rank");
         }
 
         public override void OnEnable() { }

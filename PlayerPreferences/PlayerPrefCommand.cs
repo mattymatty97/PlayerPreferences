@@ -104,7 +104,7 @@ namespace PlayerPreferences
 
         public string GetUsage()
         {
-            return "playerprefs <reload/default> <player ID, or * for all>";
+            return "prefs <reload/default> <player ID, or * for all>";
         }
 
         public string GetCommandDescription()

@@ -303,6 +303,11 @@ namespace PlayerPreferences
 
         public void OnTeamRespawn(TeamRespawnEvent ev)
         {
+            if (ev.PlayerList.Count == 0)
+            {
+                return;
+            }
+
             Player[] spectators = PluginManager.Manager.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR).ToArray();
             Plugin.Shuffle(spectators);
             

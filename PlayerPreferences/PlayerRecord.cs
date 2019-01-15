@@ -125,7 +125,7 @@ namespace PlayerPreferences
                 log?.Invoke($"Error while parsing preference file {SteamId}: No average rank found. Setting it to average.");
                 write = true;
 
-                avgRank = (float)PpPlugin.Roles.Count / 2;
+                avgRank = (float)(PpPlugin.Roles.Count + 1) / 2;
             }
             AverageRank = avgRank;
 

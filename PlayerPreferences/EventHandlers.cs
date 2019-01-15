@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Smod2;
 using Smod2.API;
 using Smod2.EventSystem.Events;
+using UnityEngine;
 
 namespace PlayerPreferences
 {
@@ -60,30 +61,25 @@ namespace PlayerPreferences
                 }
             } while (swapped);
 
-            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? recordPlayers.Average(x => 1 - (float)x.Rank / 15).ToString() : "1 (no preferences set)")}");
+            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? Mathf.Round((recordPlayers.Average(x => 1 - (float)x.Rank / 15) * 10) / 10).ToString() + "%" : "1 (no preferences set)")}");
 
             foreach (PlayerSortData player in players)
             {
                 playerRoles[player.Player] = player.Role;
-                player.Record.UpdateAverage(player.Rank);
+                player.Record?.UpdateAverage(player.Rank);
             }
         }
 
         public void OnRoundStart(RoundStartEvent ev)
         {
-            plugin.Debug("OnRoundStart invoked. Refereshing config...");
             plugin.RefreshConfig();
-
-            plugin.Debug("Retrieving players...");
+            
             Player[] players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToArray();
-            plugin.Debug("Shuffling players...");
             PpPlugin.Shuffle(players);
-
-            plugin.Debug("Converting to role tables...");
+            
             Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
 
             plugin.Info("Calculating optimal starting player roles...");
-
             AssignPlayers(playerRoles);
             foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {

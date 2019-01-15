@@ -47,9 +47,9 @@ namespace PlayerPreferences
                 : Record.AverageRank;
 
             float thisDelta = Rank - newThisRank + 
-                              Record.AverageRank - lowestAverageRank;
+                              (Record.AverageRank - lowestAverageRank) * plugin.RankWeightMultiplier;
             float otherDelta = other.Rank - newOtherRank + 
-                               other.Record.AverageRank - lowestAverageRank;
+                               (other.Record.AverageRank - lowestAverageRank) * plugin.RankWeightMultiplier;
 
             float sumDelta = thisDelta + otherDelta;
             

@@ -29,6 +29,7 @@ namespace PlayerPreferences
         
         public string[] RaRanks { get; private set; }
         public bool DistributeAll { get; private set; }
+        public float RankWeightMultiplier { get; private set; }
 
         public Preferences Preferences { get; private set; }
         public EventHandlers Handlers { get; private set; }
@@ -113,6 +114,7 @@ namespace PlayerPreferences
             AddConfig(new ConfigSetting("prefs_rank", new[] {"owner"}, SettingType.LIST, true, "Ranks allowed to adjust player Preferences."));
             AddConfig(new ConfigSetting("prefs_aliases", defaultAliases, SettingType.LIST, true, "Client console commands that can be used to run the Player Preferences."));
             AddConfig(new ConfigSetting("prefs_distribute_all", false, SettingType.BOOL, true, "Whether or not to swap roles with people who do not have preferences set."));
+            AddConfig(new ConfigSetting("prefs_rank_weight_multiplier", 1f, SettingType.FLOAT, true, "The multiplier of the rank weight difference."));
 
             Handlers = new EventHandlers(this);
             AddEventHandlers(Handlers, Priority.High);
@@ -124,6 +126,7 @@ namespace PlayerPreferences
             RaRanks = GetConfigList("prefs_rank");
             Handlers.CommandAliases = GetConfigList("prefs_aliases");
             DistributeAll = GetConfigBool("prefs_distribute_all");
+            RankWeightMultiplier = GetConfigFloat("prefs_rank_weight_multiplier");
         }
 
         public override void OnEnable()

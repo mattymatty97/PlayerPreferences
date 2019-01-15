@@ -46,7 +46,7 @@
     <Compile Include="EventHandlers.cs" />
     <Compile Include="PlayerPrefCommand.cs" />
     <Compile Include="PlayerSortData.cs" />
-    <Compile Include="Plugin.cs" />
+    <Compile Include="PpPlugin.cs" />
     <Compile Include="PlayerRecord.cs" />
     <Compile Include="Preferences.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

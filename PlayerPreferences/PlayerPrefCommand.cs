@@ -7,6 +7,13 @@ namespace PlayerPreferences
 {
     public class PlayerPrefCommand : ICommandHandler
     {
+        private readonly PpPlugin plugin;
+
+        public PlayerPrefCommand(PpPlugin plugin)
+        {
+            this.plugin = plugin;
+        }
+
         private static Player[] GetPlayers(string arg)
         {
             if (arg == "*")
@@ -36,7 +43,7 @@ namespace PlayerPreferences
 
         public string[] OnCall(ICommandSender sender, string[] args)
         {
-            if (!(sender is Server) && sender is Player player && !Plugin.ranks.Contains(player.GetRankName()))
+            if (!(sender is Server) && sender is Player player && !plugin.RaRanks.Contains(player.GetRankName()))
             {
                 return new[]
                 {
@@ -75,23 +82,23 @@ namespace PlayerPreferences
                 case "reload":
                     foreach (string steamId in players.Select(x => x.SteamId))
                     {
-                        Plugin.preferences[steamId].Read();
+                        plugin.Preferences[steamId].Read();
                     }
 
                     return new[]
                     {
-                        "Successfully reloaded preferences."
+                        "Successfully reloaded Preferences."
                     };
 
                 case "delete":
                     foreach (string steamId in players.Select(x => x.SteamId))
                     {
-                        Plugin.preferences.Remove(steamId);
+                        plugin.Preferences.Remove(steamId);
                     }
 
                     return new[]
                     {
-                        "Successfully deleted preferences"
+                        "Successfully deleted Preferences"
                     };
 
                 default:
@@ -109,7 +116,7 @@ namespace PlayerPreferences
 
         public string GetCommandDescription()
         {
-            return "Deals with reloading or removing player preferences";
+            return "Deals with reloading or removing player Preferences";
         }
     }
 }

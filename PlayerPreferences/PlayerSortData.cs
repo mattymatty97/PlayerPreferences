@@ -1,10 +1,11 @@
-﻿using Smod2;
-using Smod2.API;
+﻿using Smod2.API;
 
 namespace PlayerPreferences
 {
     public class PlayerSortData
     {
+        private readonly PpPlugin plugin;
+
         public Player Player { get; }
         private Role role;
         public Role Role
@@ -21,10 +22,11 @@ namespace PlayerPreferences
         public PlayerRecord Record { get; }
         public int Rank { get; private set; }
 
-        public PlayerSortData(Player player, Role role)
+        public PlayerSortData(Player player, Role role, PpPlugin plugin)
         {
+            this.plugin = plugin;
             Player = player;
-            Record = Plugin.preferences.Contains(player.SteamId) ? Plugin.preferences[player.SteamId] : null;
+            Record = plugin.Preferences.Contains(player.SteamId) ? plugin.Preferences[player.SteamId] : null;
 
             Role = role;
         }
@@ -35,14 +37,21 @@ namespace PlayerPreferences
 
             if (other.Record == null)
             {
-                return newThisRank < Rank;
+                return plugin.DistributeAll && newThisRank < Rank;
             }
 
             int newOtherRank = other.Record[Role];
 
-            int thisDelta = Rank - newThisRank;
-            int otherDelta = other.Rank - newOtherRank;
-            int sumDelta = thisDelta + otherDelta;
+            float lowestAverageRank = Record.AverageRank > other.Record.AverageRank
+                ? other.Record.AverageRank
+                : Record.AverageRank;
+
+            float thisDelta = Rank - newThisRank + 
+                              Record.AverageRank - lowestAverageRank;
+            float otherDelta = other.Rank - newOtherRank + 
+                               other.Record.AverageRank - lowestAverageRank;
+
+            float sumDelta = thisDelta + otherDelta;
             
             // If it is a net gain of rankings or the other player is getting demoted but is equal to or above the other rank
             return sumDelta > 0;
@@ -53,6 +62,9 @@ namespace PlayerPreferences
             Role thisRole = Role;
             Role = other.Role;
             other.Role = thisRole;
+
+            Record.UpdateAverage(Rank);
+            other.Record.UpdateAverage(other.Rank);
         }
     }
 }

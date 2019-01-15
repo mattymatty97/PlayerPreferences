@@ -198,6 +198,16 @@ namespace PlayerPreferences.Tests
             throw new NotImplementedException();
         }
 
+        public override void PersonalBroadcast(uint duration, string message, bool isMonoSpaced)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void PersonalClearBroadcasts()
+        {
+            throw new NotImplementedException();
+        }
+
         public override Vector Get106Portal()
         {
             throw new NotImplementedException();

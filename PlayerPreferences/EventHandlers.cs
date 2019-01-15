@@ -31,30 +31,31 @@ namespace PlayerPreferences
 
         private void AssignPlayers(IDictionary<Player, Role> playerRoles)
         {
+            plugin.Debug($"Creating {nameof(PlayerSortData)}s");
             PlayerSortData[] players = playerRoles.Keys.Select(x => new PlayerSortData(x, playerRoles[x], plugin)).ToArray();
             PlayerSortData[] recordPlayers = players.Where(x => x.Record != null).ToArray();
 
             bool swapped;
             do
             {
+                plugin.Debug("Looping");
                 swapped = false;
 
                 foreach (PlayerSortData player in recordPlayers)
                 {
-                    // If player is not already satisfied with their role.
-                    if (player.Rank > 0)
+                    plugin.Debug($"Checking {player.Player.Name}");
+
+                    // Find a player that is not of the same rank and willing to swap for role of current player
+                    PlayerSortData match = players.FirstOrDefault(x => x.Role != player.Role && player.ShouldSwap(x));
+
+                    // If the player exists, swap the current player and the match's roles
+                    if (match != null)
                     {
-                        // Find a player that is not of the same rank and willing to swap for role of current player
-                        PlayerSortData match = players.FirstOrDefault(x => x.Role != player.Role && player.ShouldSwap(x));
+                        plugin.Debug($"Found match for {player.Player.Name}: {match.Player.Name}");
+                        player.Swap(match);
 
-                        // If the player exists, swap the current player and the match's roles
-                        if (match != null)
-                        {
-                            player.Swap(match);
-
-                            // Register the swap to see if the match would now like to swap with anyone else
-                            swapped = true;
-                        }
+                        // Register the swap to see if the match would now like to swap with anyone else
+                        swapped = true;
                     }
                 }
             } while (swapped);
@@ -64,16 +65,21 @@ namespace PlayerPreferences
             foreach (PlayerSortData player in players)
             {
                 playerRoles[player.Player] = player.Role;
+                player.Record.UpdateAverage(player.Rank);
             }
         }
 
         public void OnRoundStart(RoundStartEvent ev)
         {
+            plugin.Debug("OnRoundStart invoked. Refereshing config...");
             plugin.RefreshConfig();
 
+            plugin.Debug("Retrieving players...");
             Player[] players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToArray();
+            plugin.Debug("Shuffling players...");
             PpPlugin.Shuffle(players);
 
+            plugin.Debug("Converting to role tables...");
             Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
 
             plugin.Info("Calculating optimal starting player roles...");
@@ -124,7 +130,7 @@ namespace PlayerPreferences
                                 if (ev.Player.DoNotTrack)
                                 {
                                     ev.ReturnMessage = "\n" +
-                                                       "Looks like you've got \"do not track\" enabled. If you want to use role Preferences, please disable do not track.";
+                                                       "Looks like you've got \"do not track\" enabled. If you want to use role preferences, please disable do not track.";
                                     return;
                                 }
 
@@ -173,7 +179,7 @@ namespace PlayerPreferences
                                 if (!plugin.Preferences.Contains(ev.Player.SteamId))
                                 {
                                     ev.ReturnMessage = "\n" +
-                                                       "You have no role Preferences. Run \".prefs create\" to regenerate your Preferences and use role Preferences again.";
+                                                       "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
                                     return;
                                 }
 
@@ -217,20 +223,20 @@ namespace PlayerPreferences
                             ev.ReturnMessage = "\n" +
                                                " // Player Preferences by Androx //\n" +
                                                "\n" +
-                                               ".prefs             - Gets all RaRanks with their corresponding roles.\n" +
+                                               ".prefs             - Gets all ranks with their corresponding roles.\n" +
                                                ".prefs help        - Shows you this page you big dumb.\n" +
-                                               ".prefs create      - Generates Preferences and unlocks commands.\n" +
-                                               ".prefs delete      - Deletes preference data on with your account.\n" +
+                                               ".prefs create      - Generates preferences and unlocks commands.\n" +
+                                               ".prefs delete      - Deletes preference data with your account.\n" +
                                                ".prefs [#] [role]  - Sets role respawn priority (1 is the highest).\n" +
-                                               ".prefs hash        - Gives hash of current Preferences.\n" +
-                                               ".prefs hash [hash] - Sets Preferences to the specified hash.";
+                                               ".prefs hash        - Gives hash of current preferences.\n" +
+                                               ".prefs hash [hash] - Sets preferences to the specified hash.";
                             return;
 
                         case "create" when !plugin.Preferences.Contains(ev.Player.SteamId): {
                             if (ev.Player.DoNotTrack)
                             {
                                 ev.ReturnMessage = "\n" +
-                                                   "Looks like you've got \"do not track\" enabled. If you want to use role Preferences, please disable do not track.";
+                                                   "Looks like you've got \"do not track\" enabled. If you want to use role preferences, please disable do not track.";
                                 return;
                             }
 
@@ -240,35 +246,35 @@ namespace PlayerPreferences
                             plugin.Preferences.Add(ev.Player.SteamId, myRoles);
 
                             ev.ReturnMessage = "\n" +
-                                               "Created random role Preferences. Use \".prefs delete\" to delete them.";
+                                               "Created random role preferences. Use \".prefs delete\" to delete them.";
                             return;
                         }
 
                         case "create":
                             ev.ReturnMessage = "\n" +
-                                               "You already have role Preferences. Use \".prefs delete\" to delete them.";
+                                               "You already have role preferences. Use \".prefs delete\" to delete them.";
                             return;
 
                         case "delete" when !plugin.Preferences.Contains(ev.Player.SteamId):
                             ev.ReturnMessage = "\n" +
-                                               "You have no role Preferences. Run \".prefs create\" to regenerate your Preferences and use role Preferences again.";
+                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
                             return;
 
                         case "delete":
                             plugin.Preferences.Remove(ev.Player.SteamId);
 
                             ev.ReturnMessage = "\n" +
-                                               "Deleted role Preferences. Run \".prefs create\" command to regenerate your Preferences and use role Preferences again.";
+                                               "Deleted role preferences. Run \".prefs create\" command to regenerate your preferences and use role preferences again.";
                             return;
 
                         case "hash" when !plugin.Preferences.Contains(ev.Player.SteamId):
                             ev.ReturnMessage = "\n" +
-                                               "You have no role Preferences. If you mean to set your Preferences with a hash, please use \".prefs hash [generated hash]\" instead.";
+                                               "You have no role preferences. If you mean to set your preferences with a hash, please use \".prefs hash [generated hash]\" instead.";
                             return;
 
                         case "hash":
                             ev.ReturnMessage = "\n" +
-                                               $"Your role Preferences hash: {string.Join("", plugin.Preferences[ev.Player.SteamId].Preferences.Select(x => PpPlugin.RoleToInt[x].ToString("X"))).ToLower()}";
+                                               $"Your role preferences hash: {string.Join("", plugin.Preferences[ev.Player.SteamId].Preferences.Select(x => PpPlugin.RoleToInt[x].ToString("X"))).ToLower()}";
                             return;
 
                         default:
@@ -288,7 +294,7 @@ namespace PlayerPreferences
                 }
 
                 ev.ReturnMessage = "\n" +
-                                   "You have not created your Preferences yet. To do so, use \".prefs create\"";
+                                   "You have not created your preferences yet. To do so, use \".prefs create\"";
             }
         }
 

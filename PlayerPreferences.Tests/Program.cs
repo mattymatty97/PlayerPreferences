@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using Smod2.API;
 
 namespace PlayerPreferences.Tests
@@ -42,7 +42,7 @@ namespace PlayerPreferences.Tests
             Console.Write("P1 Rank: ");
             int thisRank = int.Parse(Console.ReadLine() ?? "0");
             Console.Write("P2 Rank: ");
-            int otherThisRank = int.Parse(Console.ReadLine() ?? "0");
+            int otherRank = int.Parse(Console.ReadLine() ?? "0");
 
             Console.Write("P1 New Rank: ");
             int newThisRank = int.Parse(Console.ReadLine() ?? "0");
@@ -54,15 +54,9 @@ namespace PlayerPreferences.Tests
             Console.Write("P2 Avg Rank: ");
             float avg2 = float.Parse(Console.ReadLine() ?? "0");
 
-            float lowestAverageRank = avg1 > avg2
-                ? avg2
-                : avg1;
-
-            float thisDelta = thisRank - newThisRank +
-                              avg1 - lowestAverageRank;
+            float thisDelta = (thisRank - newThisRank) * avg1;
             Console.WriteLine($"P1 Delta: {thisDelta}");
-            float otherDelta = otherThisRank - newOtherRank +
-                               avg2 - lowestAverageRank;
+            float otherDelta = (otherRank - newOtherRank) * avg2;
             Console.WriteLine($"P2 Delta: {otherDelta}");
 
             float sumDelta = thisDelta + otherDelta;
@@ -77,6 +71,7 @@ namespace PlayerPreferences.Tests
             List<string> errors = new List<string>();
             new PpPlugin().LoadRoleData();
 
+            Directory.Delete("PlayerPrefs", true);
             Preferences prefs = new Preferences(Path, x => errors.Add(x));
 
             prefs.Add("123456789", new Role[14]);

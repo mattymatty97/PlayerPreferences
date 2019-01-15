@@ -1,4 +1,5 @@
 ﻿using Smod2.API;
+using UnityEngine;
 
 namespace PlayerPreferences
 {
@@ -33,28 +34,40 @@ namespace PlayerPreferences
 
         public bool ShouldSwap(PlayerSortData other)
         {
+            plugin.Debug($"Comparing {Player.Name} with {other.Player.Name}:");
+
             int newThisRank = Record[other.Role];
+            bool result;
 
             if (other.Record == null)
             {
-                return plugin.DistributeAll && newThisRank < Rank;
+                result = plugin.DistributeAll && newThisRank < Rank;
+
+                plugin.Debug( " -P2Preferences: null\n" +
+                             $" -DistributeAll: {plugin.DistributeAll}\n" +
+                             $" -P1Rank: {newThisRank}\n" +
+                             $" -P2Rank: {Rank}\n" +
+                             $" -Should swap: {result}");
+                return result;
             }
 
             int newOtherRank = other.Record[Role];
-
-            float lowestAverageRank = Record.AverageRank > other.Record.AverageRank
-                ? other.Record.AverageRank
-                : Record.AverageRank;
-
-            float thisDelta = Rank - newThisRank + 
-                              (Record.AverageRank - lowestAverageRank) * plugin.RankWeightMultiplier;
-            float otherDelta = other.Rank - newOtherRank + 
-                               (other.Record.AverageRank - lowestAverageRank) * plugin.RankWeightMultiplier;
-
+            
+            float thisDelta = (Rank - newThisRank) * Record.AverageRank * plugin.RankWeightMultiplier;
+            float otherDelta = (other.Rank - newOtherRank) * other.Record.AverageRank * plugin.RankWeightMultiplier;
             float sumDelta = thisDelta + otherDelta;
+
+            result = sumDelta > 0;
+            plugin.Debug(" -P2Preferences: exists\n" +
+                         $" -P1Avg: {Record.AverageRank}\n" +
+                         $" -P2Avg: {other.Record.AverageRank}\n" +
+                         $" -P1Delta: {thisDelta}\n" +
+                         $" -P2Delta: {otherDelta}\n" +
+                         $" -SumDelta: {sumDelta}\n" +
+                         $" -Should swap: {result}");
             
             // If it is a net gain of rankings or the other player is getting demoted but is equal to or above the other rank
-            return sumDelta > 0;
+            return result;
         }
 
         public void Swap(PlayerSortData other)
@@ -62,9 +75,6 @@ namespace PlayerPreferences
             Role thisRole = Role;
             Role = other.Role;
             other.Role = thisRole;
-
-            Record.UpdateAverage(Rank);
-            other.Record.UpdateAverage(other.Rank);
         }
     }
 }

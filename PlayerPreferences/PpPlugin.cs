@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Smod2;
 using Smod2.API;
@@ -6,6 +7,7 @@ using Smod2.Attributes;
 using Smod2.Config;
 using Smod2.Events;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace PlayerPreferences
 {
@@ -104,19 +106,30 @@ namespace PlayerPreferences
 
         public override void Register()
         {
-            Preferences = new Preferences("PlayerPrefs", Info);
+            LoadRoleData();
+            Preferences = new Preferences("PlayerPrefs", Error);
+            Info("Loaded preference files.");
 
-            string[] defaultAliases = {
+            string[] defaultAliases =
+            {
                 "prefs",
                 "playerprefs",
                 "preferences"
             };
-            AddConfig(new ConfigSetting("prefs_rank", new[] {"owner"}, SettingType.LIST, true, "Ranks allowed to adjust player Preferences."));
-            AddConfig(new ConfigSetting("prefs_aliases", defaultAliases, SettingType.LIST, true, "Client console commands that can be used to run the Player Preferences."));
-            AddConfig(new ConfigSetting("prefs_distribute_all", false, SettingType.BOOL, true, "Whether or not to swap roles with people who do not have preferences set."));
-            AddConfig(new ConfigSetting("prefs_rank_weight_multiplier", 1f, SettingType.FLOAT, true, "The multiplier of the rank weight difference."));
+            AddConfig(new ConfigSetting("prefs_rank", new[] {"owner"}, SettingType.LIST, true,
+                "Ranks allowed to adjust player Preferences."));
+            AddConfig(new ConfigSetting("prefs_aliases", defaultAliases, SettingType.LIST, true,
+                "Client console commands that can be used to run the Player Preferences."));
+            AddConfig(new ConfigSetting("prefs_distribute_all", false, SettingType.BOOL, true,
+                "Whether or not to swap roles with people who do not have preferences set."));
+            AddConfig(new ConfigSetting("prefs_rank_weight_multiplier", 1f, SettingType.FLOAT, true,
+                "The multiplier of the rank weight difference."));
 
-            Handlers = new EventHandlers(this);
+            Handlers = new EventHandlers(this)
+            {
+                CommandAliases = defaultAliases
+            };
+
             AddEventHandlers(Handlers, Priority.High);
             AddCommands(defaultAliases, new PlayerPrefCommand(this));
         }

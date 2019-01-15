@@ -61,7 +61,7 @@ namespace PlayerPreferences
                 }
             } while (swapped);
 
-            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? Mathf.Round((recordPlayers.Average(x => 1 - (float)x.Rank / 15) * 10) / 10).ToString() + "%" : "1 (no preferences set)")}");
+            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? Mathf.Round(recordPlayers.Average(x => 1 - (float)x.Rank / 15) * 1000) / 10 + "%" : "1 (no preferences set)")}");
 
             foreach (PlayerSortData player in players)
             {
@@ -225,7 +225,8 @@ namespace PlayerPreferences
                                                ".prefs delete      - Deletes preference data with your account.\n" +
                                                ".prefs [#] [role]  - Sets role respawn priority (1 is the highest).\n" +
                                                ".prefs hash        - Gives hash of current preferences.\n" +
-                                               ".prefs hash [hash] - Sets preferences to the specified hash.";
+                                               ".prefs hash [hash] - Sets preferences to the specified hash.\n" +
+                                               ".pres weight       - Displays your current preference weight.";
                             return;
 
                         case "create" when !plugin.Preferences.Contains(ev.Player.SteamId): {

@@ -82,6 +82,7 @@ namespace PlayerPreferences
         public void UpdateAverage(int rankAddition)
         {
             AverageRank = (AverageRank * AverageCounter + rankAddition + 1) / ++AverageCounter;
+            Write();
         }
 
         public void Read()

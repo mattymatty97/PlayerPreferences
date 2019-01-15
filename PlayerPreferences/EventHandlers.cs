@@ -273,6 +273,16 @@ namespace PlayerPreferences
                                                $"Your role preferences hash: {string.Join("", plugin.Preferences[ev.Player.SteamId].Preferences.Select(x => PpPlugin.RoleToInt[x].ToString("X"))).ToLower()}";
                             return;
 
+                        case "weight" when !plugin.Preferences.Contains(ev.Player.SteamId):
+                            ev.ReturnMessage = "\n" +
+                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                            return;
+
+                        case "weight":
+                            ev.ReturnMessage = "\n" +
+                                               $"Your average rank weight is {Mathf.Round(plugin.Preferences[ev.Player.SteamId].AverageRank * 100) / 100}.";
+                            return;
+
                         default:
                             ev.ReturnMessage = "\n" +
                                                "Invalid argument. Please run \".prefs help\" for a full list of commands.";

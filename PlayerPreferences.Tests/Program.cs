@@ -54,9 +54,9 @@ namespace PlayerPreferences.Tests
             Console.Write("P2 Avg Rank: ");
             float avg2 = float.Parse(Console.ReadLine() ?? "0");
 
-            float thisDelta = (thisRank - newThisRank) * avg1;
+            float thisDelta = thisRank - newThisRank + avg1;
             Console.WriteLine($"P1 Delta: {thisDelta}");
-            float otherDelta = (otherRank - newOtherRank) * avg2;
+            float otherDelta = otherRank - newOtherRank + avg2;
             Console.WriteLine($"P2 Delta: {otherDelta}");
 
             float sumDelta = thisDelta + otherDelta;

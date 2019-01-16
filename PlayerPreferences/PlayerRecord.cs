@@ -11,8 +11,9 @@ namespace PlayerPreferences
         private readonly string path;
         private readonly Action<string> log;
         
+        public int MaxAverageCount { get; set; }
         public float AverageRank { get; private set; }
-        public uint AverageCounter { get; private set; }
+        public int AverageCounter { get; private set; }
         public string SteamId { get; }
         
         public PlayerRecord(string path, string steamId, Action<string> log)
@@ -81,7 +82,12 @@ namespace PlayerPreferences
 
         public void UpdateAverage(int rankAddition)
         {
-            AverageRank = (AverageRank * AverageCounter + rankAddition + 1) / ++AverageCounter;
+            if (AverageCounter < MaxAverageCount)
+            {
+                AverageCounter++;
+            }
+
+            AverageRank = (AverageRank * (AverageCounter - 1) + rankAddition) / AverageCounter;
             Write();
         }
 
@@ -130,7 +136,7 @@ namespace PlayerPreferences
             }
             AverageRank = avgRank;
 
-            if (!uint.TryParse(averages[1], out uint avgCounter))
+            if (!int.TryParse(averages[1], out int avgCounter))
             {
                 log?.Invoke($"Error while parsing preferences file {SteamId}: No average counter found. Setting it to 1.");
                 write = true;

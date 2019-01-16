@@ -11,6 +11,8 @@ namespace PlayerPreferences
         private readonly Action<string> log;
         private readonly Dictionary<string, PlayerRecord> records;
 
+        public IEnumerable<PlayerRecord> Records => records.Values;
+
         public Preferences(string directory, Action<string> log)
         {
             this.directory = directory;

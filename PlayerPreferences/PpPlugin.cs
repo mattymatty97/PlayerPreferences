@@ -108,6 +108,7 @@ namespace PlayerPreferences
         {
             LoadRoleData();
             Preferences = new Preferences("PlayerPrefs", Error);
+
             Info("Loaded preference files.");
 
             string[] defaultAliases =
@@ -122,8 +123,10 @@ namespace PlayerPreferences
                 "Client console commands that can be used to run the Player Preferences."));
             AddConfig(new ConfigSetting("prefs_distribute_all", false, SettingType.BOOL, true,
                 "Whether or not to swap roles with people who do not have preferences set."));
-            AddConfig(new ConfigSetting("prefs_rank_weight_multiplier", 1f, SettingType.FLOAT, true,
+            AddConfig(new ConfigSetting("prefs_weight_multiplier", 1f, SettingType.FLOAT, true,
                 "The multiplier of the rank weight difference."));
+            AddConfig(new ConfigSetting("prefs_weight_max", 5, SettingType.NUMERIC, true,
+                "Maximum amount of averages to store."));
 
             Handlers = new EventHandlers(this)
             {
@@ -139,7 +142,13 @@ namespace PlayerPreferences
             RaRanks = GetConfigList("prefs_rank");
             Handlers.CommandAliases = GetConfigList("prefs_aliases");
             DistributeAll = GetConfigBool("prefs_distribute_all");
-            RankWeightMultiplier = GetConfigFloat("prefs_rank_weight_multiplier");
+            RankWeightMultiplier = GetConfigFloat("prefs_weight_multiplier");
+            
+            int maxAverages = GetConfigInt("prefs_weight_max");
+            foreach (PlayerRecord record in Preferences.Records)
+            {
+                record.MaxAverageCount = maxAverages;
+            }
         }
 
         public override void OnEnable()

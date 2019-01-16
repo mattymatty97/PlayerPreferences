@@ -53,8 +53,8 @@ namespace PlayerPreferences
 
             int newOtherRank = other.Record[Role];
             
-            float thisDelta = (Rank - newThisRank) * Record.AverageRank * plugin.RankWeightMultiplier;
-            float otherDelta = (other.Rank - newOtherRank) * other.Record.AverageRank * plugin.RankWeightMultiplier;
+            float thisDelta = Rank - newThisRank + Record.AverageRank * plugin.RankWeightMultiplier;
+            float otherDelta = other.Rank - newOtherRank + other.Record.AverageRank * plugin.RankWeightMultiplier;
             float sumDelta = thisDelta + otherDelta;
 
             result = sumDelta > 0;

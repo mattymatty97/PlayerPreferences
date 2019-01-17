@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using Smod2.API;
 
@@ -7,41 +6,45 @@ namespace PlayerPreferences
 {
     public class Preferences
     {
+        private readonly PpPlugin plugin;
         private readonly string directory;
-        private readonly Action<string> log;
         private readonly Dictionary<string, PlayerRecord> records;
 
         public IEnumerable<PlayerRecord> Records => records.Values;
 
-        public Preferences(string directory, Action<string> log)
+        public Preferences(string directory, PpPlugin plugin)
         {
             this.directory = directory;
-            this.log = log;
+            this.plugin = plugin;
             records = new Dictionary<string, PlayerRecord>();
 
             Read();
         }
 
-        public void Add(string steamId, Role[] preferences)
+        public PlayerRecord Add(string steamId, Role[] preferences)
         {
-            PlayerRecord record = new PlayerRecord($"{directory}/{steamId}.txt", steamId, log)
+            PlayerRecord record = new PlayerRecord($"{directory}/{steamId}.txt", steamId, plugin)
             {
                 Preferences = preferences
             };
             record.Write();
 
             records.Add(steamId, record);
+
+            return record;
         }
 
-        public void Remove(string steamId)
+        public bool Remove(string steamId)
         {
             if (!records.ContainsKey(steamId))
             {
-                return;
+                return false;
             }
 
             records[steamId].Delete();
             records.Remove(steamId);
+
+            return true;
         }
 
         public bool Contains(string steamId)
@@ -56,11 +59,11 @@ namespace PlayerPreferences
                 foreach (string file in Directory.GetFiles(directory, "*.txt"))
                 {
                     string steamId = Path.GetFileNameWithoutExtension(file);
-                    PlayerRecord record = PlayerRecord.Load(file, steamId, log);
+                    PlayerRecord record = PlayerRecord.Load(file, steamId, plugin);
 
                     if (record == null)
                     {
-                        log?.Invoke($"Preference record {file} is either corrupt or out of date. Take a look at it and make sure all the roles are valid, and split by comma.");
+                        plugin.Error($"Preference record {file} is either corrupt or out of date.");
                     }
                     else
                     {

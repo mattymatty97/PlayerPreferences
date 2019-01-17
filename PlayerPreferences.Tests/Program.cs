@@ -37,6 +37,21 @@ namespace PlayerPreferences.Tests
             }
         }
 
+        private static float Clamp(float a, float b, float value)
+        {
+            if (value < a)
+            {
+                return a;
+            }
+
+            if (value > b)
+            {
+                return b;
+            }
+
+            return value;
+        }
+
         public static void SwapTest()
         {
             Console.Write("P1 Rank: ");
@@ -64,25 +79,6 @@ namespace PlayerPreferences.Tests
 
             // If it is a net gain of rankings or the other player is getting demoted but is equal to or above the other rank
             Console.WriteLine($"Swapping: {sumDelta > 0}");
-        }
-
-        public static void IOTest()
-        {
-            List<string> errors = new List<string>();
-            new PpPlugin().LoadRoleData();
-
-            Directory.Delete("PlayerPrefs", true);
-            Preferences prefs = new Preferences(Path, x => errors.Add(x));
-
-            prefs.Add("123456789", new Role[14]);
-            CheckForErrors(errors);
-            prefs.Read();
-            CheckForErrors(errors);
-
-            prefs.Add("1234567890", PpPlugin.Roles.Select(x => x.Value).ToArray());
-            CheckForErrors(errors);
-            prefs.Remove("1234567890");
-            CheckForErrors(errors);
         }
     }
 }

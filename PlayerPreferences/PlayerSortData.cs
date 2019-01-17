@@ -1,11 +1,14 @@
-﻿using Smod2.API;
-using UnityEngine;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Smod2.API;
 
 namespace PlayerPreferences
 {
     public class PlayerSortData
     {
         private readonly PpPlugin plugin;
+        private readonly Dictionary<PlayerSortData, Role> recentlyCompared;
 
         public Player Player { get; }
         private Role role;
@@ -26,41 +29,81 @@ namespace PlayerPreferences
         public PlayerSortData(Player player, Role role, PpPlugin plugin)
         {
             this.plugin = plugin;
+            recentlyCompared = new Dictionary<PlayerSortData, Role>();
+
             Player = player;
             Record = plugin.Preferences.Contains(player.SteamId) ? plugin.Preferences[player.SteamId] : null;
 
             Role = role;
         }
 
-        public bool ShouldSwap(PlayerSortData other)
+        private void AddComparison(PlayerSortData data)
         {
-            plugin.Debug($"Comparing {Player.Name} with {other.Player.Name}:");
-
-            int newThisRank = Record[other.Role];
-            bool result;
-
-            if (other.Record == null)
+            if (recentlyCompared.ContainsKey(data))
             {
-                result = plugin.DistributeAll && newThisRank < Rank;
+                recentlyCompared[data] = data.Role;
+            }
+            else
+            {
+                recentlyCompared.Add(data, data.Role);
+            }
+        }
 
-                plugin.Debug( " -P2Preferences: null\n" +
-                             $" -DistributeAll: {plugin.DistributeAll}\n" +
-                             $" -P1Rank: {newThisRank}\n" +
-                             $" -P2Rank: {Rank}\n" +
-                             $" -Should swap: {result}");
-                return result;
+        private bool JustCompared(PlayerSortData data)
+        {
+            return recentlyCompared.ContainsKey(data) && recentlyCompared[data] == data.Role;
+        }
+
+        public bool Compare(PlayerSortData checker)
+        {
+            plugin.Debug($"Comparing {Player.Name} ({Role}) with {checker.Player.Name} ({checker.Role})");
+
+            if (JustCompared(checker))
+            {
+                return false;
             }
 
-            int newOtherRank = other.Record[Role];
+            AddComparison(checker);
+            checker.AddComparison(this);
+
+            if (checker.Role == Role) // If this player was just swapped with checker and the checker has the same role we lost from the swap
+            {
+                return false;
+            }
+
+            int? newThisRank = Record?[checker.Role];
+            int? newOtherRank = checker.Record?[Role];
+
+            if (newThisRank == null)
+            {
+                if (newOtherRank == null)
+                {
+                    return false;
+                }
+
+                return plugin.DistributeAll && newOtherRank < checker.Rank;
+            }
+
+            if (newOtherRank == null)
+            {
+                return plugin.DistributeAll && newThisRank < Rank;
+            }
             
-            float thisDelta = Rank - newThisRank + Record.AverageRank * plugin.RankWeightMultiplier;
-            float otherDelta = other.Rank - newOtherRank + other.Record.AverageRank * plugin.RankWeightMultiplier;
+            plugin.Debug(string.Join(", ", Record.Preferences.Select(x => x.ToString())));
+            plugin.Debug(string.Join(", ", checker.Record.Preferences.Select(x => x.ToString())));
+
+            float thisDelta = Rank - newThisRank.Value + (Record.AverageRank - newThisRank.Value) * plugin.RankWeightMultiplier;
+            float otherDelta = checker.Rank - newOtherRank.Value + (checker.Record.AverageRank - newOtherRank.Value) * plugin.RankWeightMultiplier;
             float sumDelta = thisDelta + otherDelta;
 
-            result = sumDelta > 0;
-            plugin.Debug(" -P2Preferences: exists\n" +
+            bool result = sumDelta > 0;
+            plugin.Debug( " \n" +
+                         $" -P1Rank: {Rank}\n" +
+                         $" -P2Rank: {checker.Rank}\n" +
+                         $" -P1OtherRank: {newThisRank}\n" +
+                         $" -P2OtherRank: {newOtherRank}\n" +
                          $" -P1Avg: {Record.AverageRank}\n" +
-                         $" -P2Avg: {other.Record.AverageRank}\n" +
+                         $" -P2Avg: {checker.Record.AverageRank}\n" +
                          $" -P1Delta: {thisDelta}\n" +
                          $" -P2Delta: {otherDelta}\n" +
                          $" -SumDelta: {sumDelta}\n" +

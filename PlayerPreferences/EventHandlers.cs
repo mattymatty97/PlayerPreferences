@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace PlayerPreferences
 {
-    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerRoundStart, IEventHandlerTeamRespawn
+    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerSetConfig, IEventHandlerWaitingForPlayers, IEventHandlerRoundStart, IEventHandlerTeamRespawn
     {
         private readonly PpPlugin plugin;
 
@@ -32,36 +32,26 @@ namespace PlayerPreferences
 
         private void AssignPlayers(IDictionary<Player, Role> playerRoles)
         {
-            plugin.Debug($"Creating {nameof(PlayerSortData)}s");
-            PlayerSortData[] players = playerRoles.Keys.Select(x => new PlayerSortData(x, playerRoles[x], plugin)).ToArray();
-            PlayerSortData[] recordPlayers = players.Where(x => x.Record != null).ToArray();
-
-            bool swapped;
-            do
+            PlayerSortData[] players = playerRoles.Select(x => new PlayerSortData(x.Key, x.Value, plugin)).ToArray();
+            
+            for (int i = 0; i < players.Length; i++)
             {
-                plugin.Debug("Looping");
-                swapped = false;
+                PlayerSortData player = players[i];
+                plugin.Debug($"Checking {player.Player.Name}");
 
-                foreach (PlayerSortData player in recordPlayers)
+                // Find a player that is willing to swap for role of current player
+                PlayerSortData match = players.FirstOrDefault(x => player.Compare(x));
+
+                // If the player exists, swap the current player and the match's roles
+                if (match != null)
                 {
-                    plugin.Debug($"Checking {player.Player.Name}");
+                    plugin.Debug($"Found match for {player.Player.Name}: {match.Player.Name}");
+                    player.Swap(match);
 
-                    // Find a player that is not of the same rank and willing to swap for role of current player
-                    PlayerSortData match = players.FirstOrDefault(x => x.Role != player.Role && player.ShouldSwap(x));
-
-                    // If the player exists, swap the current player and the match's roles
-                    if (match != null)
-                    {
-                        plugin.Debug($"Found match for {player.Player.Name}: {match.Player.Name}");
-                        player.Swap(match);
-
-                        // Register the swap to see if the match would now like to swap with anyone else
-                        swapped = true;
-                    }
+                    // Go back to start to check if anyone wants to swap because of the newrole
+                    i = -1;
                 }
-            } while (swapped);
-
-            plugin.Info($"Overall happiness rating: {(recordPlayers.Length > 0 ? Mathf.Round(recordPlayers.Average(x => 1 - (float)x.Rank / 15) * 1000) / 10 + "%" : "1 (no preferences set)")}");
+            }
 
             foreach (PlayerSortData player in players)
             {
@@ -70,10 +60,13 @@ namespace PlayerPreferences
             }
         }
 
-        public void OnRoundStart(RoundStartEvent ev)
+        public void OnWaitingForPlayers(WaitingForPlayersEvent ev)
         {
             plugin.RefreshConfig();
-            
+        }
+
+        public void OnRoundStart(RoundStartEvent ev)
+        {
             Player[] players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToArray();
             PpPlugin.Shuffle(players);
             
@@ -85,8 +78,7 @@ namespace PlayerPreferences
             {
                 playerRole.Key.ChangeRole(playerRole.Value);
             }
-
-            plugin.Info("Roles set!");
+            plugin.Info("Player roles set!");
         }
 
         public void OnCallCommand(PlayerCallCommandEvent ev)
@@ -334,6 +326,7 @@ namespace PlayerPreferences
 
             plugin.Info("Calculating optimal team respawn roles...");
             AssignPlayers(players);
+            plugin.Info("Player roles set!");
 
             if (ev.SpawnChaos)
             {
@@ -344,6 +337,14 @@ namespace PlayerPreferences
                 ev.PlayerList = players.Where(x => x.Value == Role.NTF_COMMANDER).Take(1).Select(x => x.Key)
                     .Concat(players.Where(x => x.Value == Role.NTF_LIEUTENANT).Take(3).Select(x => x.Key))
                     .Concat(players.Where(x => x.Value == Role.NTF_CADET).Select(x => x.Key)).ToList();
+            }
+        }
+
+        public void OnSetConfig(SetConfigEvent ev)
+        {
+            if (ev.Key == "smart_class_picker")
+            {
+                ev.Value = plugin.UseSmartClassPicker;
             }
         }
     }

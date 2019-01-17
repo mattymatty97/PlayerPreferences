@@ -8,32 +8,32 @@ namespace PlayerPreferences
 {
     public class PlayerRecord
     {
+        private readonly PpPlugin plugin;
         private readonly string path;
-        private readonly Action<string> log;
         
-        public int MaxAverageCount { get; set; }
         public float AverageRank { get; private set; }
         public int AverageCounter { get; private set; }
         public string SteamId { get; }
-        
-        public PlayerRecord(string path, string steamId, Action<string> log)
+
+        public PlayerRecord(string path, string steamId, PpPlugin plugin)
         {
             SteamId = steamId;
             this.path = path;
-            this.log = log;
+            this.plugin = plugin;
         }
 
-        public static PlayerRecord Load(string path, string steamId, Action<string> log)
+        public static PlayerRecord Load(string path, string steamId, PpPlugin plugin)
         {
-            PlayerRecord player = new PlayerRecord(path, steamId, log);
+            PlayerRecord player = new PlayerRecord(path, steamId, plugin);
 
             try
             {
                 player.Read();
                 return player;
             }
-            catch
+            catch (Exception e)
             {
+                plugin.Error($"Preference record {steamId} threw an exception while loading:\n{e}");
                 return null;
             }
         }
@@ -82,13 +82,27 @@ namespace PlayerPreferences
 
         public void UpdateAverage(int rankAddition)
         {
-            if (AverageCounter < MaxAverageCount)
+            if (AverageCounter < plugin.MaxAverageCount)
             {
                 AverageCounter++;
             }
 
             AverageRank = (AverageRank * (AverageCounter - 1) + rankAddition) / AverageCounter;
             Write();
+        }
+
+        private static void FixRoles(IList<Role> roles)
+        {
+            Role[] fillerRoles = PpPlugin.Roles.Values.Except(roles).ToArray();
+            int fillerI = 0;
+            for (int i = 0; i < roles.Count; i++)
+            {
+                // Not set
+                if (roles[i] == Role.UNASSIGNED)
+                {
+                    roles[i] = fillerRoles[fillerI++];
+                }
+            }
         }
 
         public void Read()
@@ -100,7 +114,7 @@ namespace PlayerPreferences
             const int partsNeeded = 2;
             if (fields.Length < partsNeeded)
             {
-                log?.Invoke($"Error while parsing preference file {SteamId}: Less than {partsNeeded} parts found. Setting it to default.");
+                plugin.Error($"Error while parsing preference file {SteamId}: Less than {partsNeeded} parts found. Setting it to default.");
                 write = true;
 
                 Role[] randomRoles = PpPlugin.Roles.Select(x => x.Value).ToArray();
@@ -117,7 +131,7 @@ namespace PlayerPreferences
             const int avgPartsNeeded = 2;
             if (averages.Length < avgPartsNeeded)
             {
-                log?.Invoke($"Error while parsing preference file {SteamId}: Less than {avgPartsNeeded} average parts found. Setting average to default.");
+                plugin.Error($"Error while parsing preference file {SteamId}: Less than {avgPartsNeeded} average parts found. Setting average to default.");
                 write = true;
 
                 averages = new[]
@@ -129,7 +143,7 @@ namespace PlayerPreferences
 
             if (!float.TryParse(averages[0], out float avgRank))
             {
-                log?.Invoke($"Error while parsing preference file {SteamId}: No average rank found. Setting it to average.");
+                plugin.Error($"Error while parsing preference file {SteamId}: No average rank found. Setting it to average.");
                 write = true;
 
                 avgRank = (float)(PpPlugin.Roles.Count + 1) / 2;
@@ -138,7 +152,7 @@ namespace PlayerPreferences
 
             if (!int.TryParse(averages[1], out int avgCounter))
             {
-                log?.Invoke($"Error while parsing preferences file {SteamId}: No average counter found. Setting it to 1.");
+                plugin.Error($"Error while parsing preferences file {SteamId}: No average counter found. Setting it to 1.");
                 write = true;
 
                 avgCounter = 1;
@@ -149,11 +163,11 @@ namespace PlayerPreferences
             int[] intPreferences = new int[PpPlugin.Roles.Count];
             Role[] validRoles = new Role[intPreferences.Length];
 
-            for (int i = 0; i < intPreferences.Length; i++)
+            for (int i = 0; i < strPreferences.Length && i < intPreferences.Length; i++)
             {
-                if (i < strPreferences.Length && int.TryParse(strPreferences[i], out int preference) && validRoles.Contains((Role)preference))
+                if (int.TryParse(strPreferences[i], out int preference) && PpPlugin.IntToRole.ContainsKey(preference))
                 {
-                    validRoles[i] = (Role)preference;
+                    validRoles[i] = PpPlugin.IntToRole[preference];
                 }
                 else
                 {
@@ -162,24 +176,24 @@ namespace PlayerPreferences
             }
 
             // Too many or not enough roles, or error while parsing string into int
-            if (strPreferences.Length < validRoles.Length || validRoles.Any(x => x == Role.UNASSIGNED))
+            if (strPreferences.Length < validRoles.Length)
             {
-                log?.Invoke($"Error while parsing preference file {SteamId}: Too little roles or invalid role numbers. Attempting to fix.");
+                plugin.Error($"Error while parsing preference file {SteamId}: Too little roles. Attempting to fix.");
                 write = true;
 
-                for (int i = 0; i < validRoles.Length; i++)
-                {
-                    // Not set
-                    if (validRoles[i] == Role.UNASSIGNED)
-                    {
-                        validRoles[i] = PpPlugin.Roles.FirstOrDefault(x => !validRoles.Contains(x.Value)).Value;
-                    }
-                }
+                FixRoles(validRoles);
+            }
+            else if (validRoles.Any(x => x == Role.UNASSIGNED))
+            {
+                plugin.Error($"Error while parsing preference file {SteamId}: Invalid role numbers. Attempting to fix.");
+                write = true;
+
+                FixRoles(validRoles);
             }
 
             if (strPreferences.Length > intPreferences.Length)
             {
-                log?.Invoke($"Error while parsing preference file {SteamId}: Too many roles. Taking the first {PpPlugin.Roles.Count} and writing to file to prevent further errors.");
+                plugin.Error($"Error while parsing preference file {SteamId}: Too many roles. Taking the first {PpPlugin.Roles.Count} and writing to file to prevent further errors.");
                 write = true;
             }
 
@@ -193,7 +207,7 @@ namespace PlayerPreferences
 
         public void Write()
         {
-            File.WriteAllText(path, $"{AverageRank},{AverageCounter}:{string.Join(",", preferences.Select(x => (int)x))}");
+            File.WriteAllText(path, $"{AverageRank},{AverageCounter}:{string.Join(",", preferences.Select(x => PpPlugin.RoleToInt[x]))}");
         }
 
         public void Delete()

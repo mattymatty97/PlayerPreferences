@@ -1,5 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Smod2;
 using Smod2.API;
@@ -32,6 +32,8 @@ namespace PlayerPreferences
         public string[] RaRanks { get; private set; }
         public bool DistributeAll { get; private set; }
         public float RankWeightMultiplier { get; private set; }
+        public int MaxAverageCount { get; private set; }
+        public bool UseSmartClassPicker { get; private set; }
 
         public Preferences Preferences { get; private set; }
         public EventHandlers Handlers { get; private set; }
@@ -107,8 +109,8 @@ namespace PlayerPreferences
         public override void Register()
         {
             LoadRoleData();
-            Preferences = new Preferences("PlayerPrefs", Error);
 
+            Preferences = new Preferences(Path.Combine(FileManager.GetAppFolder(), "PlayerPreferences"), this);
             Info("Loaded preference files.");
 
             string[] defaultAliases =
@@ -127,6 +129,8 @@ namespace PlayerPreferences
                 "The multiplier of the rank weight difference."));
             AddConfig(new ConfigSetting("prefs_weight_max", 5, SettingType.NUMERIC, true,
                 "Maximum amount of averages to store."));
+            AddConfig(new ConfigSetting("prefs_smart_class_picker", false, SettingType.BOOL, true,
+                "Whether or not to use Smart Class Picker with Player Preferences. Recommended to keep false for performance issues."));
 
             Handlers = new EventHandlers(this)
             {
@@ -143,12 +147,8 @@ namespace PlayerPreferences
             Handlers.CommandAliases = GetConfigList("prefs_aliases");
             DistributeAll = GetConfigBool("prefs_distribute_all");
             RankWeightMultiplier = GetConfigFloat("prefs_weight_multiplier");
-            
-            int maxAverages = GetConfigInt("prefs_weight_max");
-            foreach (PlayerRecord record in Preferences.Records)
-            {
-                record.MaxAverageCount = maxAverages;
-            }
+            MaxAverageCount = GetConfigInt("prefs_weight_max");
+            UseSmartClassPicker = GetConfigBool("prefs_smart_class_picker");
         }
 
         public override void OnEnable()
@@ -209,27 +209,29 @@ namespace PlayerPreferences
 
         public static void Shuffle<T>(IList<T> list)
         {
-            int n = list.Count;
-            while (n > 1)
+            int count = list.Count;
+            int last = count - 1;
+
+            for (var i = 0; i < last; ++i)
             {
-                n--;
-                int k = Random.Range(0, n + 1);
-                T value = list[k];
-                list[k] = list[n];
-                list[n] = value;
+                int r = Random.Range(i, count);
+                T tmp = list[i];
+                list[i] = list[r];
+                list[r] = tmp;
             }
         }
 
         public static void Shuffle<T>(T[] array)
         {
-            int n = array.Length;
-            while (n > 1)
+            int count = array.Length;
+            int last = count - 1;
+
+            for (var i = 0; i < last; ++i)
             {
-                n--;
-                int k = Random.Range(0, n + 1);
-                T value = array[k];
-                array[k] = array[n];
-                array[n] = value;
+                int r = Random.Range(i, count);
+                T tmp = array[i];
+                array[i] = array[r];
+                array[r] = tmp;
             }
         }
     }

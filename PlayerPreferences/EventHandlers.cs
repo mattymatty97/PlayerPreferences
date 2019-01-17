@@ -218,7 +218,7 @@ namespace PlayerPreferences
                                                ".prefs [#] [role]  - Sets role respawn priority (1 is the highest).\n" +
                                                ".prefs hash        - Gives hash of current preferences.\n" +
                                                ".prefs hash [hash] - Sets preferences to the specified hash.\n" +
-                                               ".pres weight       - Displays your current preference weight.";
+                                               ".prefs average     - Displays your current preference weight.";
                             return;
 
                         case "create" when !plugin.Preferences.Contains(ev.Player.SteamId): {
@@ -265,15 +265,15 @@ namespace PlayerPreferences
                             ev.ReturnMessage = "\n" +
                                                $"Your role preferences hash: {string.Join("", plugin.Preferences[ev.Player.SteamId].Preferences.Select(x => PpPlugin.RoleToInt[x].ToString("X"))).ToLower()}";
                             return;
-
-                        case "weight" when !plugin.Preferences.Contains(ev.Player.SteamId):
+                            
+                        case "average" when !plugin.Preferences.Contains(ev.Player.SteamId):
                             ev.ReturnMessage = "\n" +
                                                "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
                             return;
-
-                        case "weight":
+                            
+                        case "average":
                             ev.ReturnMessage = "\n" +
-                                               $"Your average rank weight is {Mathf.Round(plugin.Preferences[ev.Player.SteamId].AverageRank * 100) / 100}.";
+                                               $"Your average rank is {Mathf.Round(plugin.Preferences[ev.Player.SteamId].AverageRank * 100) / 100}.";
                             return;
 
                         default:

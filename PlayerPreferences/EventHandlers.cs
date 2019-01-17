@@ -342,9 +342,9 @@ namespace PlayerPreferences
 
         public void OnSetConfig(SetConfigEvent ev)
         {
-            if (ev.Key == "smart_class_picker")
+            if (ev.Key == "smart_class_picker" && plugin.DisableSmartClassPicker)
             {
-                ev.Value = plugin.UseSmartClassPicker;
+                ev.Value = false;
             }
         }
     }

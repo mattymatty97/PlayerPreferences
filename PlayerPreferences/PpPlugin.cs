@@ -33,7 +33,7 @@ namespace PlayerPreferences
         public bool DistributeAll { get; private set; }
         public float RankWeightMultiplier { get; private set; }
         public int MaxAverageCount { get; private set; }
-        public bool UseSmartClassPicker { get; private set; }
+        public bool DisableSmartClassPicker { get; private set; }
 
         public Preferences Preferences { get; private set; }
         public EventHandlers Handlers { get; private set; }
@@ -109,8 +109,8 @@ namespace PlayerPreferences
         public override void Register()
         {
             LoadRoleData();
-
-            Preferences = new Preferences(Path.Combine(FileManager.GetAppFolder(), "PlayerPreferences"), this);
+            
+            Preferences = new Preferences(Path.Combine(FileManager.GetAppFolder(), "PlayerPreferences", "Data"), this);
             Info("Loaded preference files.");
 
             string[] defaultAliases =
@@ -148,7 +148,7 @@ namespace PlayerPreferences
             DistributeAll = GetConfigBool("prefs_distribute_all");
             RankWeightMultiplier = GetConfigFloat("prefs_weight_multiplier");
             MaxAverageCount = GetConfigInt("prefs_weight_max");
-            UseSmartClassPicker = GetConfigBool("prefs_smart_class_picker");
+            DisableSmartClassPicker = !GetConfigBool("prefs_smart_class_picker");
         }
 
         public override void OnEnable()

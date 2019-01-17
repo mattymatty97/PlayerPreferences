@@ -218,7 +218,7 @@ namespace PlayerPreferences
                                                ".prefs [#] [role]  - Sets role respawn priority (1 is the highest).\n" +
                                                ".prefs hash        - Gives hash of current preferences.\n" +
                                                ".prefs hash [hash] - Sets preferences to the specified hash.\n" +
-                                               ".prefs average     - Displays your current preference weight.";
+                                               ".prefs average     - Displays your average rank.";
                             return;
 
                         case "create" when !plugin.Preferences.Contains(ev.Player.SteamId): {

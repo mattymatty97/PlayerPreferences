@@ -34,6 +34,7 @@ namespace PlayerPreferences
         public float RankWeightMultiplier { get; private set; }
         public int MaxAverageCount { get; private set; }
         public bool DisableSmartClassPicker { get; private set; }
+        public int MaxRoundStartComparisons { get; private set; }
 
         public Preferences Preferences { get; private set; }
         public EventHandlers Handlers { get; private set; }
@@ -131,6 +132,8 @@ namespace PlayerPreferences
                 "Maximum amount of averages to store."));
             AddConfig(new ConfigSetting("prefs_smart_class_picker", false, SettingType.BOOL, true,
                 "Whether or not to use Smart Class Picker with Player Preferences. Recommended to keep false for performance issues."));
+            AddConfig(new ConfigSetting("prefs_roundstart_cap", 10000, SettingType.NUMERIC, true,
+                "Maximum amount of comparisons on round start to perform before the plugin stops halting round start."));
 
             Handlers = new EventHandlers(this)
             {
@@ -149,6 +152,7 @@ namespace PlayerPreferences
             RankWeightMultiplier = GetConfigFloat("prefs_weight_multiplier");
             MaxAverageCount = GetConfigInt("prefs_weight_max");
             DisableSmartClassPicker = !GetConfigBool("prefs_smart_class_picker");
+            MaxRoundStartComparisons = GetConfigInt("prefs_roundstart_cap");
         }
 
         public override void OnEnable()

@@ -48,7 +48,7 @@
   <ItemGroup>
     <Compile Include="EventHandlers.cs" />
     <Compile Include="PlayerPrefCommand.cs" />
-    <Compile Include="PlayerSortData.cs" />
+    <Compile Include="PlayerData.cs" />
     <Compile Include="PpPlugin.cs" />
     <Compile Include="PlayerRecord.cs" />
     <Compile Include="Preferences.cs" />

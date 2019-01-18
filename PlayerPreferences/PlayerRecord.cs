@@ -64,7 +64,7 @@ namespace PlayerPreferences
             }
         }
 
-        public int this[Role role]
+        public int? this[Role role]
         {
             get
             {
@@ -76,7 +76,7 @@ namespace PlayerPreferences
                     }
                 }
 
-                return -1;
+                return null;
             }
         }
 

@@ -41,30 +41,12 @@ namespace PlayerPreferences
             Player[] players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToArray();
             PpPlugin.Shuffle(players);
             
-            Dictionary<Player, Role>[] playerRoles = new Dictionary<Player, Role>[10];
-            playerRoles = playerRoles.Select(a => players.ToDictionary(x => x, x => x.TeamRole.Role)).ToArray();
+            Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
 
             plugin.Info("Calculating optimal starting player roles...");
-
-            DateTimeOffset timeStart = DateTimeOffset.UtcNow;
-            foreach (var roles in playerRoles)
-                AssignRoles(roles);
-            TimeSpan time = DateTimeOffset.UtcNow.Subtract(timeStart);
-
-            plugin.Info(string.Join(",", playerRoles.Last().Select(x => $"{x.Key.PlayerId}:{(int)x.Value}")));
-            plugin.Info(time.TotalSeconds.ToString());
-
-            playerRoles = playerRoles.Select(a => players.ToDictionary(x => x, x => x.TeamRole.Role)).ToArray();
-            timeStart = DateTimeOffset.UtcNow;
-            foreach (var roles in playerRoles)
-                ExperimentalAssignRoles(roles);
-            time = DateTimeOffset.UtcNow.Subtract(timeStart);
-
-            plugin.Info(string.Join(",", playerRoles.Last().Select(x => $"{x.Key.PlayerId}:{(int)x.Value}")));
-            plugin.Info(time.TotalSeconds.ToString());
-
-
-            foreach (KeyValuePair<Player, Role> playerRole in playerRoles.Last())
+            AssignRoles(playerRoles);
+            
+            foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {
                 playerRole.Key.ChangeRole(playerRole.Value);
             }
@@ -293,33 +275,43 @@ namespace PlayerPreferences
                 return;
             }
 
-            List<Player> spectators = plugin.Server.GetPlayers().Where(x => x.TeamRole.Role == Role.SPECTATOR).ToList();
-            PpPlugin.Shuffle(spectators);
+            List<KeyValuePair<int, PlayerData>> spectatorList = plugin.Server.GetPlayers()
+                .Where(x => x.TeamRole.Role == Role.SPECTATOR)
+                .Select(x => new KeyValuePair<int, PlayerData>(x.PlayerId, new PlayerData(x, Role.SPECTATOR, plugin)))
+                .ToList();
+            PpPlugin.Shuffle(spectatorList);
+            Dictionary<int, PlayerData> spectators = spectatorList.ToDictionary(x => x.Key, x => x.Value);
 
             plugin.Info("Calculating optimal team respawn roles...");
             if (ev.SpawnChaos)
             {
-                ev.PlayerList = RankedPlayers(spectators, ev.PlayerList, Role.CHAOS_INSURGENCY).Take(ev.PlayerList.Count).ToList();
+                ev.PlayerList = RankedPlayers(spectators.Values, ev.PlayerList, Role.CHAOS_INSURGENCY).Take(ev.PlayerList.Count).ToList();
             }
             else
             {
                 List<Player> mtf = new List<Player>();
 
-                Player commander = RankedPlayers(spectators, ev.PlayerList.Take(1).ToList(), Role.NTF_COMMANDER).First();
-                spectators.Remove(commander);
+                Player commander = RankedPlayers(spectators.Values, ev.PlayerList.Take(1).ToList(), Role.NTF_COMMANDER).First();
                 mtf.Add(commander);
+
+                spectators.Remove(commander.PlayerId);
 
                 int remainingMtf = ev.PlayerList.Count - 1;
                 if (remainingMtf > 0)
                 {
                     int lieutenantCount = Mathf.Min(remainingMtf, 3);
-                    Player[] lieutenants = RankedPlayers(spectators, ev.PlayerList.Skip(1).Take(3).ToList(), Role.NTF_LIEUTENANT).Take(lieutenantCount).ToArray();
+
+                    Player[] lieutenants = RankedPlayers(spectators.Values, ev.PlayerList.Skip(1).Take(3).ToList(), Role.NTF_LIEUTENANT).Take(lieutenantCount).ToArray();
                     mtf.AddRange(lieutenants);
-                    spectators.RemoveAll(x => lieutenants.Contains(x));
+                    
+                    foreach (Player lieutenant in lieutenants)
+                    {
+                        spectators.Remove(lieutenant.PlayerId);
+                    }
 
                     if ((remainingMtf -= lieutenantCount) > 0)
                     {
-                        mtf.AddRange(RankedPlayers(spectators, ev.PlayerList.Skip(4).ToList(), Role.NTF_CADET).Take(remainingMtf));
+                        mtf.AddRange(RankedPlayers(spectators.Values, ev.PlayerList.Skip(4).ToList(), Role.NTF_CADET).Take(remainingMtf));
                     }
                 }
 
@@ -379,57 +371,27 @@ namespace PlayerPreferences
 
             plugin.Info($"Roles roles set after {comparisons} comparisons.");
         }
-        
-        private void ExperimentalAssignRoles(IDictionary<Player, Role> playerRoles)
+
+        private IEnumerable<Player> RankedPlayers(IEnumerable<PlayerData> rankablePlayers, IReadOnlyCollection<Player> defaultPlayers, Role role)
         {
-            Dictionary<Role, IEnumerable<Player>> roleRanking = playerRoles.Values
-                .Distinct()
-                .ToDictionary(x => x, x =>
-                    RankedPlayers(playerRoles.Keys, playerRoles
-                            .Where(y => y.Value == x)
-                            .Select(y => y.Key)
-                            .ToList(), x)
-                    );
-
-            foreach (KeyValuePair<Role, IEnumerable<Player>> rolePlayers in roleRanking)
-            {
-                foreach (Player player in rolePlayers.Value)
-                {
-                    playerRoles[player] = rolePlayers.Key;
-                }
-            }
-        }
-
-        private IEnumerable<Player> RankedPlayers(IEnumerable<Player> rankablePlayers, IReadOnlyCollection<Player> defaultPlayers, Role role)
-        {
-            plugin.Info("Rankable: " + string.Join(",", rankablePlayers.Select(x => x.PlayerId)));
-            plugin.Info("Default: " + string.Join(",", defaultPlayers.Select(x => x.PlayerId)));
-
             Player[] ranked = rankablePlayers
-                .Select(x => new PlayerData(x, Role.SPECTATOR, plugin))
                 .ToDictionary(x => x, x => x.RoleRating(role))
                 .Where(x => x.Value.HasValue)
                 .OrderByDescending(x => x.Value.Value)
                 .Take(defaultPlayers.Count)
-                .Select(x =>
-                {
-                    plugin.Info($"Rank {role}: {x.Key.Player.PlayerId}:{x.Value.Value}");
-                    return x.Key.Player;
-                })
+                .Select(x => x.Key.Player)
                 .ToArray();
-            int offset = 0;
+            int rankedIndex = 0;
             
             foreach (Player player in defaultPlayers)
             {
                 if (!plugin.Preferences.Contains(player.SteamId) && !plugin.DistributeAll)
                 {
-                    plugin.Info($"Returning default player: {player.PlayerId}");
                     yield return player;
                 }
-                else if (offset < ranked.Length)
+                else if (rankedIndex < ranked.Length)
                 {
-                    plugin.Info($"Returning ranked player: {ranked[offset].PlayerId}");
-                    yield return ranked[offset++];
+                    yield return ranked[rankedIndex++];
                 }
             }
         }

@@ -369,7 +369,7 @@ namespace PlayerPreferences
                 player.Record?.UpdateAverage(player.Rank);
             }
 
-            plugin.Info($"Roles roles set after {comparisons} comparisons.");
+            plugin.Info($"Roles set after {comparisons} comparisons.");
         }
 
         private IEnumerable<Player> RankedPlayers(IEnumerable<PlayerData> rankablePlayers, IReadOnlyCollection<Player> defaultPlayers, Role role)

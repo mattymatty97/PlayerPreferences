@@ -338,7 +338,7 @@ namespace PlayerPreferences
             {
                 if (comparisons + players.Length > plugin.MaxRoundStartComparisons)
                 {
-                    plugin.Error($"Maximum comparison limit exceeded ({comparisons} + {players.Length} to be performed with limit of {plugin.MaxRoundStartComparisons}). Sorting stopped to prevent halting the server further.");
+                    plugin.Error($"Maximum comparison limit exceeded ({comparisons} + {players.Length} to be performed with limit of {plugin.MaxRoundStartComparisons}). Sorting stopped to prevent halting the server further. If this happens frequently, consider increasing prefs_roundstart_cap.");
                     break;
                 }
 

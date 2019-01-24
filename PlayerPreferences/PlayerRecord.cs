@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Smod2.API;
@@ -82,12 +83,8 @@ namespace PlayerPreferences
 
         public void UpdateAverage(int rankAddition)
         {
-            if (AverageCounter < plugin.MaxAverageCount)
-            {
-                AverageCounter++;
-            }
-
-            AverageRank = (AverageRank * (AverageCounter - 1) + rankAddition) / AverageCounter;
+	        int rankWeight = AverageCounter < plugin.MaxAverageCount ? AverageCounter : AverageCounter++;
+			AverageRank = (AverageRank * rankWeight + rankAddition) / AverageCounter;
             Write();
         }
 
@@ -141,7 +138,7 @@ namespace PlayerPreferences
                 };
             }
 
-            if (!float.TryParse(averages[0], out float avgRank))
+            if (!float.TryParse(averages[0], NumberStyles.Any, CultureInfo.InvariantCulture, out float avgRank))
             {
                 plugin.Error($"Error while parsing preference file {SteamId}: No average rank found. Setting it to average.");
                 write = true;
@@ -207,7 +204,7 @@ namespace PlayerPreferences
 
         public void Write()
         {
-            File.WriteAllText(path, $"{AverageRank},{AverageCounter}:{string.Join(",", preferences.Select(x => PpPlugin.RoleToInt[x]))}");
+            File.WriteAllText(path, $"{AverageRank},{AverageCounter}:{string.Join(",", preferences.Select(x => PpPlugin.RoleToInt[x].ToString(CultureInfo.InvariantCulture).Replace(",", "")))}");
         }
 
         public void Delete()

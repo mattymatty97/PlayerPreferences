@@ -36,6 +36,10 @@ namespace PlayerPreferences
         public bool DisableSmartClassPicker { get; private set; }
         public int MaxRoundStartComparisons { get; private set; }
 
+		public string RootDirectory { get; private set; }
+		public string DumpDirectory { get; private set; }
+		public string DataDirectory { get; private set; }
+
         public Preferences Preferences { get; private set; }
         public EventHandlers Handlers { get; private set; }
 
@@ -107,11 +111,28 @@ namespace PlayerPreferences
             IntToRole = RoleToInt.ToDictionary(x => x.Value, x => x.Key);
         }
 
+	    private void CreateDirectories(params string[] dirs)
+	    {
+		    foreach (string dir in dirs)
+		    {
+			    if (!Directory.Exists(dir))
+			    {
+				    Directory.CreateDirectory(dir);
+			    }
+		    }
+	    }
+
         public override void Register()
         {
             LoadRoleData();
-            
-            Preferences = new Preferences(Path.Combine(FileManager.GetAppFolder(), "PlayerPreferences", "Data"), this);
+
+	        RootDirectory = Path.Combine(FileManager.GetAppFolder(), "PlayerPreferences");
+	        DataDirectory = Path.Combine(RootDirectory, "Data");
+	        DumpDirectory = Path.Combine(RootDirectory, "Dumps");
+
+			CreateDirectories(RootDirectory, DataDirectory, DumpDirectory);
+
+			Preferences = new Preferences(DataDirectory, this);
             Info("Loaded preference files.");
 
             string[] defaultAliases =

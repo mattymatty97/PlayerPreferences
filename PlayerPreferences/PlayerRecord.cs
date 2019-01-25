@@ -202,14 +202,36 @@ namespace PlayerPreferences
             }
         }
 
-        public void Write()
+	    public float? RoleRating(Role newRole)
+	    {
+		    int? roleRank = this[newRole];
+
+		    if (roleRank == null)
+		    {
+			    return null;
+		    }
+
+		    return roleRank.Value + (AverageRank - roleRank.Value) * plugin.RankWeightMultiplier;
+	    }
+
+		public void Write()
         {
-            File.WriteAllText(path, $"{AverageRank},{AverageCounter}:{string.Join(",", preferences.Select(x => PpPlugin.RoleToInt[x].ToString(CultureInfo.InvariantCulture).Replace(",", "")))}");
+            File.WriteAllText(path, OutputData());
         }
 
         public void Delete()
         {
             File.Delete(path);
         }
+
+	    public string OutputData()
+	    {
+		    return $"{AverageRank},{AverageCounter.ToString(CultureInfo.InvariantCulture).Replace(",", "")}:{string.Join(",", preferences.Select(x => PpPlugin.RoleToInt[x]))}";
+	    }
+
+	    public override string ToString()
+	    {
+		    return $"{AverageRank} (count {AverageCounter}) {string.Join(",", preferences.Select(x => PpPlugin.RoleToInt[x]))} ({SteamId})";
+	    }
     }
 }

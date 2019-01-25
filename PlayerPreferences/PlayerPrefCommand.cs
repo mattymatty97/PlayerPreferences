@@ -51,7 +51,7 @@ namespace PlayerPreferences
                 };
             }
 
-            if (args.Length < 2)
+            if (args.Length < 1)
             {
                 return new[]
                 {
@@ -59,47 +59,87 @@ namespace PlayerPreferences
                 };
             }
 
-            Player[] players = GetPlayers(args[1]);
-
-            if (players == null)
-            {
-                return new[]
-                {
-                    "Invalid player selector. Please specify a player ID, a SteamID, or use a wildcard (*) for all players."
-                };
-            }
-
-            if (players.Length == 0)
-            {
-                return new[]
-                {
-                    "No players found using the selector."
-                };
-            }
-
             switch (args[0])
             {
-                case "reload":
-                    foreach (string steamId in players.Select(x => x.SteamId))
-                    {
-                        plugin.Preferences[steamId].Read();
-                    }
+				case "reload" when args.Length < 2:
+					return new[]
+					{
+						"Invalid arguments length. Please specify at least 2 arguments."
+					};
 
-                    return new[]
-                    {
-                        "Successfully reloaded Preferences."
-                    };
+	            case "reload":
+	            {
+		            Player[] players = GetPlayers(args[1]);
 
-                case "delete":
-                    foreach (string steamId in players.Select(x => x.SteamId))
-                    {
-                        plugin.Preferences.Remove(steamId);
-                    }
+		            if (players == null)
+		            {
+			            return new[]
+			            {
+				            "Invalid player selector. Please specify a player ID, a SteamID, or use a wildcard (*) for all players."
+			            };
+		            }
 
-                    return new[]
-                    {
-                        "Successfully deleted Preferences"
-                    };
+		            if (players.Length == 0)
+		            {
+			            return new[]
+			            {
+				            "No players found using the selector."
+			            };
+		            }
+
+		            foreach (string steamId in players.Select(x => x.SteamId))
+		            {
+			            plugin.Preferences[steamId].Read();
+		            }
+
+		            return new[]
+		            {
+			            "Successfully reloaded Preferences."
+		            };
+				}
+
+	            case "delete" when args.Length < 2:
+		            return new[]
+		            {
+			            "Invalid arguments length. Please specify at least 2 arguments."
+		            };
+
+				case "delete":
+	            {
+		            Player[] players = GetPlayers(args[1]);
+
+		            if (players == null)
+		            {
+			            return new[]
+			            {
+				            "Invalid player selector. Please specify a player ID, a SteamID, or use a wildcard (*) for all players."
+			            };
+		            }
+
+		            if (players.Length == 0)
+		            {
+			            return new[]
+			            {
+				            "No players found using the selector."
+			            };
+		            }
+
+		            foreach (string steamId in players.Select(x => x.SteamId))
+		            {
+			            plugin.Preferences.Remove(steamId);
+		            }
+
+		            return new[]
+		            {
+			            "Successfully deleted Preferences"
+		            };
+				}
+
+				case "dump":
+					return new[]
+					{
+						$"Data dumped to: \"{plugin.Preferences.Dump()}\""
+					};
 
                 default:
                     return new[]

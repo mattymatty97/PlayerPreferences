@@ -43,8 +43,8 @@ namespace PlayerPreferences
                 return false;
             }
 
-            float? thisRank = RoleRating(checker.Role);
-            float? otherRank = checker.RoleRating(Role);
+            float? thisRank = Rank - Record?.RoleRating(checker.Role);
+            float? otherRank = checker.Rank - checker.Record?.RoleRating(Role);
 
             if (thisRank == null)
             {
@@ -90,18 +90,6 @@ namespace PlayerPreferences
             Role thisRole = Role;
             Role = other.Role;
             other.Role = thisRole;
-        }
-
-        public virtual float? RoleRating(Role newRole)
-        {
-            int? roleRank = Record?[newRole];
-
-            if (roleRank == null)
-            {
-                return null;
-            }
-
-            return Rank - roleRank.Value + (Record.AverageRank - roleRank.Value) * plugin.RankWeightMultiplier;
         }
     }
 

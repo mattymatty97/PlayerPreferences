@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Smod2.API;
 
 namespace PlayerPreferences
@@ -54,35 +56,44 @@ namespace PlayerPreferences
 
         public void Read()
         {
-            if (Directory.Exists(directory))
+            foreach (string file in Directory.GetFiles(directory, "*.txt"))
             {
-                foreach (string file in Directory.GetFiles(directory, "*.txt"))
-                {
-                    string steamId = Path.GetFileNameWithoutExtension(file);
-                    PlayerRecord record = PlayerRecord.Load(file, steamId, plugin);
+                string steamId = Path.GetFileNameWithoutExtension(file);
+                PlayerRecord record = PlayerRecord.Load(file, steamId, plugin);
 
-                    if (record == null)
+                if (record == null)
+                {
+                    plugin.Error($"Preference record {file} is either corrupt or out of date.");
+                }
+                else
+                {
+                    if (records.ContainsKey(steamId))
                     {
-                        plugin.Error($"Preference record {file} is either corrupt or out of date.");
+                        records[steamId] = record;
                     }
                     else
                     {
-                        if (records.ContainsKey(steamId))
-                        {
-                            records[steamId] = record;
-                        }
-                        else
-                        {
-                            records.Add(steamId, record);
-                        }
+                        records.Add(steamId, record);
                     }
                 }
             }
-            else
-            {
-                Directory.CreateDirectory(directory);
-            }
         }
+
+		public string Dump()
+	    {
+		    DateTime time = DateTime.Now;
+		    string path = Path.Combine(plugin.DumpDirectory, $"{time.Year}-{time.Month:00}-{time.Day:00}_{time.Hour:00}_{time.Minute:00}.txt");
+
+			File.WriteAllLines(path, records
+				.Select(x => 
+					x.Key + ":" + 
+					x.Value.OutputData() + ":" + 
+					string.Join(",", x.Value.Preferences.Select(y => x.Value.RoleRating(y)))
+				)
+			);
+
+		    return path;
+	    }
 
         public PlayerRecord this[string steamId] => records[steamId];
     }

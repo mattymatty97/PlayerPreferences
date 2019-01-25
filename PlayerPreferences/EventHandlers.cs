@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using Smod2.EventHandlers;
 using Smod2.Events;
@@ -338,7 +339,13 @@ namespace PlayerPreferences
             {
                 if (comparisons + players.Length > plugin.MaxRoundStartComparisons)
                 {
-                    plugin.Error($"Maximum comparison limit exceeded ({comparisons} + {players.Length} to be performed with limit of {plugin.MaxRoundStartComparisons}). Sorting stopped to prevent halting the server further. If this happens frequently, consider increasing prefs_roundstart_cap.");
+                    plugin.Error($"Maximum comparison limit exceeded ({comparisons} + {players.Length} to be performed with limit of {plugin.MaxRoundStartComparisons}). " +
+                                  "If this happens frequently and you have a large amount of players (20 or more), consider increasing prefs_roundstart_cap. " +
+                                  "If you have less than 20 players, please report this to me (Androx on Discord) and privately send me your dump file." +
+                                  "Now generating dump file...");
+					
+					plugin.Error($"Data successfully dumped to \"{plugin.Preferences.Dump()}\".");
+
                     break;
                 }
 
@@ -375,7 +382,7 @@ namespace PlayerPreferences
         private IEnumerable<Player> RankedPlayers(IEnumerable<PlayerData> rankablePlayers, IReadOnlyCollection<Player> defaultPlayers, Role role)
         {
             Player[] ranked = rankablePlayers
-                .ToDictionary(x => x, x => x.RoleRating(role))
+                .ToDictionary(x => x, x => x.Record?.RoleRating(role))
                 .Where(x => x.Value.HasValue)
                 .OrderByDescending(x => x.Value.Value)
                 .Take(defaultPlayers.Count)

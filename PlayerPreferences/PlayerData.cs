@@ -34,13 +34,13 @@ namespace PlayerPreferences
             Role = role;
         }
 
-        public virtual bool Compare(PlayerData checker)
+        public virtual float? Compare(PlayerData checker)
         {
             plugin.Debug($"Comparing {Player.Name} ({Role}) with {checker.Player.Name} ({checker.Role})");
 
             if (checker.Role == Role) // If this player was just swapped with checker and the checker has the same role we lost from the swap
             {
-                return false;
+                return 0;
             }
 
             float? thisRank = Rank - Record?.RoleRating(checker.Role);
@@ -50,15 +50,26 @@ namespace PlayerPreferences
             {
                 if (otherRank == null)
                 {
-                    return false;
+                    return 0;
                 }
 
-                return plugin.DistributeAll && otherRank < checker.Rank;
+                if (plugin.DistributeAll)
+                {
+                    return otherRank - checker.Rank;
+                }
+                
+                return -100;
+               
             }
 
             if (otherRank == null)
             {
-                return plugin.DistributeAll && thisRank < Rank;
+                if (plugin.DistributeAll)
+                {
+                    return thisRank - checker.Rank;
+                }
+
+                return -100;
             }
 
             plugin.Debug(string.Join(", ", Record.Preferences.Select(x => x.ToString())));
@@ -75,14 +86,12 @@ namespace PlayerPreferences
                          $" -P2Delta: {otherRank}\n");
             
             float sumDelta = thisRank.Value + otherRank.Value;
-            bool result = sumDelta > 0;
 
             plugin.Debug("\n" +
-                         $" -SumDelta: {sumDelta}\n" +
-                         $" -Should swap: {result}");
+                         $" -SumDelta: {sumDelta}\n");
             
             // If it is a net gain of rankings or the other player is getting demoted but is equal to or above the other rank
-            return result;
+            return sumDelta;
         }
 
         public virtual void Swap(PlayerData other)
@@ -119,11 +128,11 @@ namespace PlayerPreferences
             return recentlyCompared.ContainsKey(data) && recentlyCompared[data] == data.Role;
         }
 
-        public override bool Compare(PlayerData checker)
+        public override float? Compare(PlayerData checker)
         {
             if (JustCompared(checker))
             {
-                return false;
+                return -100;
             }
 
             AddComparison(checker);

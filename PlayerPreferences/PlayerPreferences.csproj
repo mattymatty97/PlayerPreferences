@@ -33,6 +33,10 @@
     <Reference Include="Assembly-CSharp">
       <HintPath>..\..\SerpentsHand\References\Assembly-CSharp.dll</HintPath>
     </Reference>
+    <Reference Include="ExifLib, Version=1.0.2.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\ExifLib.PCL.1.0.2-pre01\lib\netstandard1.0\ExifLib.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Smod2">
       <HintPath>..\References\Smod2.dll</HintPath>
     </Reference>
@@ -44,6 +48,18 @@
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>..\References\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
+    <Reference Include="XLabs.Core, Version=2.3.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\XLabs.Core.2.3.0-pre05\lib\portable-net45+win8+wpa81+wp8+monoandroid+monotouch+xamarinios10+xamarinmac\XLabs.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="XLabs.IOC, Version=2.3.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\XLabs.IoC.2.3.0-pre05\lib\portable-net45+win8+wpa81+wp8+monoandroid+monotouch+xamarinios10+xamarinmac\XLabs.IOC.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="XLabs.Serialization, Version=2.3.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\packages\XLabs.Serialization.2.3.0-pre05\lib\portable-net45+netcore45+wpa81+wp8+monoandroid+monotouch+xamarinios10+xamarinmac\XLabs.Serialization.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EventHandlers.cs" />
@@ -53,6 +69,9 @@
     <Compile Include="PlayerRecord.cs" />
     <Compile Include="Preferences.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

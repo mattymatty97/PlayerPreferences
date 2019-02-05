@@ -292,6 +292,8 @@ namespace PlayerPreferences
             {
                 List<Player> mtf = new List<Player>();
 
+                int var = 0;
+
                 Player commander = RankedPlayers(spectators.Values, ev.PlayerList.Take(1).ToList(), Role.NTF_COMMANDER).First();
                 mtf.Add(commander);
 
@@ -334,40 +336,69 @@ namespace PlayerPreferences
             PlayerData[] players = playerRoles.Select(x => (PlayerData) new PlayerSortData(x.Key, x.Value, plugin)).ToArray();
 
             int comparisons = 0;
-
-            for (int i = 0; i < players.Length; i++)
+            
+            //i've been making some rough calculations:
+            //with 50 players connected one loop will make around 1250 comparsions + other 1250 recursions
+            //after 3 loops it should have already reached the best roles ( around 7500 worst case )
+            //i suggest to keep it like this but it can be increased
+            int maxloops = 3;
+            int swaps = players.Length;
+            
+            for (int loop = 0; (comparisons < plugin.MaxRoundStartComparisons) && (loop < maxloops) && (swaps>0) ; loop++) 
             {
-                if (comparisons + players.Length > plugin.MaxRoundStartComparisons)
+
+                float?[,] swapRanking = new float?[players.Length, players.Length];
+
+                for (int i = 0; i < players.Length; i++)
                 {
-                    plugin.Error($"Maximum comparison limit exceeded ({comparisons} + {players.Length} to be performed with limit of {plugin.MaxRoundStartComparisons}). " +
-                                  "If this happens frequently and you have a large amount of players (20 or more), consider increasing prefs_roundstart_cap. " +
-                                  "If you have less than 20 players, please report this to me (Androx on Discord) and privately send me your dump file." +
-                                  "Now generating dump file...");
-					
-					plugin.Error($"Data successfully dumped to \"{plugin.Preferences.Dump()}\".");
+                    if (comparisons + players.Length > plugin.MaxRoundStartComparisons)
+                    {
+                        plugin.Error(
+                            $"Maximum comparison limit exceeded ({comparisons} + {players.Length} to be performed with limit of {plugin.MaxRoundStartComparisons}). " +
+                            "Now generating dump file...");
+
+                        plugin.Error($"Data successfully dumped to \"{plugin.Preferences.Dump()}\".");
+
+                        break;
+                    }
+
+                    PlayerData player = players[i];
+                    plugin.Debug($"Calculating {player.Player.Name}");
+
+                    for (int j = i + 1; j < players.Length; j++)
+                    {
+                        comparisons++;
+                        // calculate swap rating for this player
+                        float? swapRate=  player.Compare(players[j]);
+                        swapRanking[i, j] = swapRate;
+                        swapRanking[j, i] = swapRate;
+                    }
+                }
+                
+                if (comparisons + Math.Pow(players.Length,2)/2 > plugin.MaxRoundStartComparisons)
+      
+                {
+                    plugin.Error(
+                        $"Maximum comparison limit exceeded ({comparisons} + ({players.Length}^2)/2 to be performed with limit of {plugin.MaxRoundStartComparisons}). " +
+                        "Now generating dump file...");
+
+                    plugin.Error($"Data successfully dumped to \"{plugin.Preferences.Dump()}\".");
 
                     break;
                 }
 
-                PlayerData player = players[i];
-                plugin.Debug($"Checking {player.Player.Name}");
+                int[] playerSwaps = Rbest_swaps(swapRanking,ref comparisons);
 
-                // Find a player that is willing to swap for role of current player
-                PlayerData match = players.FirstOrDefault(x =>
+                swaps = 0;
+                for (int i = 0; i < players.Length; i++)
                 {
-                    comparisons++;
-                    return player.Compare(x);
-                });
-
-                // If the player exists, swap the current player and the match's roles
-                if (match != null)
-                {
-                    plugin.Debug($"Found match for {player.Player.Name}: {match.Player.Name}");
-                    player.Swap(match);
-
-                    // Go back to start to check if anyone wants to swap because of the newrole
-                    i = -1;
+                    if (playerSwaps[i] != -1 && playerSwaps[i] != i)
+                    {
+                        players[i].Swap(players[playerSwaps[i]]);
+                        swaps++;
+                    }
                 }
+                
             }
 
             foreach (PlayerData player in players)
@@ -388,7 +419,14 @@ namespace PlayerPreferences
                 .Take(defaultPlayers.Count)
                 .Select(x => x.Key.Player)
                 .ToArray();
+            Player[] unranked = rankablePlayers
+                .ToDictionary(x => x, x => x.Record?.RoleRating(role))
+                .Where(x => !x.Value.HasValue)
+                .Take(defaultPlayers.Count)
+                .Select(x => x.Key.Player)
+                .ToArray();
             int rankedIndex = 0;
+            int unrankedIndex = 0;
             
             foreach (Player player in defaultPlayers)
             {
@@ -399,6 +437,57 @@ namespace PlayerPreferences
                 else if (rankedIndex < ranked.Length)
                 {
                     yield return ranked[rankedIndex++];
+                }
+                else
+                {
+                    yield return unranked[unrankedIndex++];
+                }
+            }
+        }
+
+        private int[] Rbest_swaps(float?[,] ranks,ref int comparisons)
+        {
+
+            int size = ranks.GetLength(0);
+            int[] best = Enumerable.Repeat(-1, size).ToArray();
+            int[] act = Enumerable.Repeat(-1, size).ToArray();
+            float bestValue=0;
+            _Rbest_swaps(ref comparisons, ranks, size, ref best, ref bestValue, ref act , 0);
+            return best;
+        }
+
+        private void _Rbest_swaps(ref int comparisons, float?[,] ranks,int size,ref int[] best,ref float bestvalue, ref int[] act, int i)
+        {
+            if (i == size)
+            {
+                float val=0;
+                for( int j = 0 ; j < size ; j++ )
+                {
+                    val += ranks[j, act[j]]??0;
+                }
+
+                if (val > bestvalue)
+                {
+                    Array.Copy(act,best,size);
+                    bestvalue = val;
+                }
+                return;
+            }
+
+            if (act[i] != -1)
+            {
+                _Rbest_swaps(ref comparisons, ranks, size, ref best, ref bestvalue, ref act, i + 1);
+            }
+            else
+            {
+                for (int j = i; j < size; j++)
+                {
+                    comparisons++;
+                    act[i] = j;
+                    act[j] = i;
+                    _Rbest_swaps(ref comparisons, ranks, size, ref best, ref bestvalue, ref act, i + 1);
+                    act[i] = -1;
+                    act[j] = -1;
                 }
             }
         }

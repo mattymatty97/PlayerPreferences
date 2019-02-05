@@ -292,8 +292,6 @@ namespace PlayerPreferences
             {
                 List<Player> mtf = new List<Player>();
 
-                int var = 0;
-
                 Player commander = RankedPlayers(spectators.Values, ev.PlayerList.Take(1).ToList(), Role.NTF_COMMANDER).First();
                 mtf.Add(commander);
 

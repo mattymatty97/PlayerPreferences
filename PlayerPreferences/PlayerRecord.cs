@@ -38,6 +38,9 @@ namespace PlayerPreferences
                 return null;
             }
         }
+        
+        private int[] Rpreferences;
+        public int[] RPreferences => Rpreferences;
 
         private Role[] preferences;
         public Role[] Preferences
@@ -49,7 +52,11 @@ namespace PlayerPreferences
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), "Length does not match the length of all preference roles.");
                 }
-
+                Rpreferences = new int[18];
+                for (int i = 0; i < value.Length; i++)
+                {
+                    Rpreferences[(int) value[i]] = i+1;
+                }
                 preferences = value;
                 Write();
             }

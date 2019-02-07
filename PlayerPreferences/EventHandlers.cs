@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Smod2.EventHandlers;
 using Smod2.Events;
 using System.Text.RegularExpressions;
@@ -49,7 +50,8 @@ namespace PlayerPreferences
             
             foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {
-                playerRole.Key.ChangeRole(playerRole.Value);
+                if(playerRole.Key.TeamRole.Role!=playerRole.Value)
+                    playerRole.Key.ChangeRole(playerRole.Value);
             }
         }
 
@@ -276,43 +278,48 @@ namespace PlayerPreferences
                 return;
             }
 
-            List<KeyValuePair<int, PlayerData>> spectatorList = plugin.Server.GetPlayers()
+            Dictionary<int,PlayerData> spectators = plugin.Server.GetPlayers()
                 .Where(x => x.TeamRole.Role == Role.SPECTATOR)
-                .Select(x => new KeyValuePair<int, PlayerData>(x.PlayerId, new PlayerData(x, Role.SPECTATOR, plugin)))
-                .ToList();
-            PpPlugin.Shuffle(spectatorList);
-            Dictionary<int, PlayerData> spectators = spectatorList.ToDictionary(x => x.Key, x => x.Value);
+                .Select(x => new PlayerData(x, Role.SPECTATOR, plugin))
+                .ToDictionary(x=>x.Player.PlayerId,x=>x);
+            Dictionary<int,Player> defaultUnrankedPlayers = ev.PlayerList
+                .Select(x => new PlayerData(x, Role.SPECTATOR, plugin))
+                .Where( x=> x.Record == null)
+                .Select(x=>x.Player)
+                .ToDictionary(x=>x.PlayerId,x=>x);
 
             plugin.Info("Calculating optimal team respawn roles...");
             if (ev.SpawnChaos)
             {
-                ev.PlayerList = RankedPlayers(spectators.Values, ev.PlayerList, Role.CHAOS_INSURGENCY).Take(ev.PlayerList.Count).ToList();
+                ev.PlayerList = RankedPlayers(spectators.Values, defaultUnrankedPlayers.Values, ev.PlayerList, Role.CHAOS_INSURGENCY,ev.PlayerList.Count).Take(ev.PlayerList.Count).ToList();
             }
             else
             {
                 List<Player> mtf = new List<Player>();
 
-                Player commander = RankedPlayers(spectators.Values, ev.PlayerList.Take(1).ToList(), Role.NTF_COMMANDER).First();
+                Player commander = RankedPlayers(spectators.Values,defaultUnrankedPlayers.Values, ev.PlayerList.Take(1).ToList(), Role.NTF_COMMANDER,1).First();
                 mtf.Add(commander);
 
                 spectators.Remove(commander.PlayerId);
+                defaultUnrankedPlayers.Remove(commander.PlayerId);
 
                 int remainingMtf = ev.PlayerList.Count - 1;
                 if (remainingMtf > 0)
                 {
                     int lieutenantCount = Mathf.Min(remainingMtf, 3);
 
-                    Player[] lieutenants = RankedPlayers(spectators.Values, ev.PlayerList.Skip(1).Take(3).ToList(), Role.NTF_LIEUTENANT).Take(lieutenantCount).ToArray();
+                    Player[] lieutenants = RankedPlayers(spectators.Values,defaultUnrankedPlayers.Values, ev.PlayerList.Skip(1).Take(3).ToList(), Role.NTF_LIEUTENANT,lieutenantCount).Take(lieutenantCount).ToArray();
                     mtf.AddRange(lieutenants);
                     
                     foreach (Player lieutenant in lieutenants)
                     {
                         spectators.Remove(lieutenant.PlayerId);
+                        defaultUnrankedPlayers.Remove(lieutenant.PlayerId);
                     }
 
                     if ((remainingMtf -= lieutenantCount) > 0)
                     {
-                        mtf.AddRange(RankedPlayers(spectators.Values, ev.PlayerList.Skip(4).ToList(), Role.NTF_CADET).Take(remainingMtf));
+                        mtf.AddRange(RankedPlayers(spectators.Values,defaultUnrankedPlayers.Values, ev.PlayerList.Skip(4).ToList(), Role.NTF_CADET,remainingMtf).Take(remainingMtf));
                     }
                 }
 
@@ -331,84 +338,36 @@ namespace PlayerPreferences
 
         private void AssignRoles(IDictionary<Player, Role> playerRoles)
         {
-            PlayerData[] players = playerRoles.Select(x => (PlayerData) new PlayerSortData(x.Key, x.Value, plugin)).ToArray();
-
-            int comparisons = 0;
             
-            //i've been making some rough calculations:
-            //with 50 players connected one loop will make around 1250 comparsions + other 1250 recursions
-            //after 3 loops it should have already reached the best roles ( around 7500 worst case )
-            //i suggest to keep it like this but it can be increased
-            int maxloops = 3;
-            int swaps = players.Length;
+            Dictionary<Role,int> RoleCounter = new Dictionary<Role, int>();
+           
+            PlayerData[] players = playerRoles.Select(x =>
+            {
+                if (!plugin.Preferences.Contains(x.Key.SteamId) && plugin.DistributeAll)
+                { //if distributing all add the role to availables
+                    if (RoleCounter.ContainsKey(x.Value))
+                        RoleCounter[x.Value]++;
+                    else
+                        RoleCounter.Add(x.Value, 1);
+                }
+
+                return new PlayerData(x.Key,x.Value,plugin);
+            }).ToArray();
             
-            for (int loop = 0; (comparisons < plugin.MaxRoundStartComparisons) && (loop < maxloops) && (swaps>0) ; loop++) 
+            _RData data = new _RData(players,RoleCounter);
+
+            _Rassign(data, 0);
+
+            for (int i = 0; i < players.Length; i++)
             {
-
-                float?[,] swapRanking = new float?[players.Length, players.Length];
-
-                for (int i = 0; i < players.Length; i++)
-                {
-                    if (comparisons + players.Length > plugin.MaxRoundStartComparisons)
-                    {
-                        plugin.Error(
-                            $"Maximum comparison limit exceeded ({comparisons} + {players.Length} to be performed with limit of {plugin.MaxRoundStartComparisons}). " +
-                            "Now generating dump file...");
-
-                        plugin.Error($"Data successfully dumped to \"{plugin.Preferences.Dump()}\".");
-
-                        break;
-                    }
-
-                    PlayerData player = players[i];
-                    plugin.Debug($"Calculating {player.Player.Name}");
-
-                    for (int j = i + 1; j < players.Length; j++)
-                    {
-                        comparisons++;
-                        // calculate swap rating for this player
-                        float? swapRate=  player.Compare(players[j]);
-                        swapRanking[i, j] = swapRate;
-                        swapRanking[j, i] = swapRate;
-                    }
-                }
-                
-                if (comparisons + Math.Pow(players.Length,2)/2 > plugin.MaxRoundStartComparisons)
-      
-                {
-                    plugin.Error(
-                        $"Maximum comparison limit exceeded ({comparisons} + ({players.Length}^2)/2 to be performed with limit of {plugin.MaxRoundStartComparisons}). " +
-                        "Now generating dump file...");
-
-                    plugin.Error($"Data successfully dumped to \"{plugin.Preferences.Dump()}\".");
-
-                    break;
-                }
-
-                int[] playerSwaps = Rbest_swaps(swapRanking,ref comparisons);
-
-                swaps = 0;
-                for (int i = 0; i < players.Length; i++)
-                {
-                    if (playerSwaps[i] != -1 && playerSwaps[i] != i)
-                    {
-                        players[i].Swap(players[playerSwaps[i]]);
-                        swaps++;
-                    }
-                }
-                
+                playerRoles[players[i].Player] = data.bestAssign[i];
             }
-
-            foreach (PlayerData player in players)
-            {
-                playerRoles[player.Player] = player.Role;
-                player.Record?.UpdateAverage(player.Rank);
-            }
-
-            plugin.Info($"Roles set after {comparisons} comparisons.");
+            
+            
+            plugin.Info($"Roles set after {data.recursions} comparisons.");
         }
 
-        private IEnumerable<Player> RankedPlayers(IEnumerable<PlayerData> rankablePlayers, IReadOnlyCollection<Player> defaultPlayers, Role role)
+        private IEnumerable<Player> RankedPlayers(IEnumerable<PlayerData> rankablePlayers,IEnumerable<Player> defaultUnrankedPlayers, IReadOnlyCollection<Player> defaultPlayers, Role role, int size)
         {
             Player[] ranked = rankablePlayers
                 .ToDictionary(x => x, x => x.Record?.RoleRating(role))
@@ -417,17 +376,16 @@ namespace PlayerPreferences
                 .Take(defaultPlayers.Count)
                 .Select(x => x.Key.Player)
                 .ToArray();
-            Player[] unranked = rankablePlayers
-                .ToDictionary(x => x, x => x.Record?.RoleRating(role))
-                .Where(x => !x.Value.HasValue)
-                .Take(defaultPlayers.Count)
-                .Select(x => x.Key.Player)
-                .ToArray();
             int rankedIndex = 0;
             int unrankedIndex = 0;
+
+            int count = 0;
             
             foreach (Player player in defaultPlayers)
             {
+                if(count>size)
+                    break;
+                count++;
                 if (!plugin.Preferences.Contains(player.SteamId) && !plugin.DistributeAll)
                 {
                     yield return player;
@@ -438,55 +396,69 @@ namespace PlayerPreferences
                 }
                 else
                 {
-                    yield return unranked[unrankedIndex++];
+                    yield return defaultUnrankedPlayers.ToArray()[unrankedIndex++];
                 }
             }
         }
-
-        private int[] Rbest_swaps(float?[,] ranks,ref int comparisons)
+        
+        private class _RData
         {
+            public int recursions;
+            public PlayerData[] players;
+            public int size => players.Length;
+            public Dictionary<Role, int> roleCounter;
+            public Role[] bestAssign;
+            public float bestSum;
+            public Role[] actAssign;
+            public float actSum;
 
-            int size = ranks.GetLength(0);
-            int[] best = Enumerable.Repeat(-1, size).ToArray();
-            int[] act = Enumerable.Repeat(-1, size).ToArray();
-            float bestValue=0;
-            _Rbest_swaps(ref comparisons, ranks, size, ref best, ref bestValue, ref act , 0);
-            return best;
+            public _RData(PlayerData[] players, Dictionary<Role, int> roleCounter)
+            {
+                this.players = players;
+                this.roleCounter = roleCounter;
+                bestAssign = new Role[players.Length];
+                actAssign = new Role[players.Length];
+                bestSum = 0;
+                actSum = 0;
+            }
         }
 
-        private void _Rbest_swaps(ref int comparisons, float?[,] ranks,int size,ref int[] best,ref float bestvalue, ref int[] act, int i)
+        private void _Rassign(_RData data, int deept)
         {
-            if (i == size)
+            if (deept == data.size)
             {
-                float val=0;
-                for( int j = 0 ; j < size ; j++ )
+                if (data.actSum > data.bestSum)
                 {
-                    val += ranks[j, act[j]]??0;
-                }
-
-                if (val > bestvalue)
-                {
-                    Array.Copy(act,best,size);
-                    bestvalue = val;
+                    Array.Copy(data.actAssign,data.bestAssign,data.size);
                 }
                 return;
             }
 
-            if (act[i] != -1)
+            data.recursions++;
+
+            PlayerData curr = data.players[deept];
+
+            if (curr.Record != null || plugin.DistributeAll)
             {
-                _Rbest_swaps(ref comparisons, ranks, size, ref best, ref bestvalue, ref act, i + 1);
+                foreach (var role in data.roleCounter.Keys)
+                {
+                    if (data.roleCounter[role] != 0)
+                    {
+                        float val =  data.players[deept].Record?.RoleRating(data.actAssign[deept])??0;
+                        data.actAssign[deept] = role;
+                        data.roleCounter[role]--;
+                        data.actSum += val;
+                        _Rassign(data,deept+1);
+                        data.roleCounter[role]++;
+                        data.actAssign[deept] = Role.UNASSIGNED;
+                        data.actSum -= val;
+                    }
+                }
             }
             else
             {
-                for (int j = i; j < size; j++)
-                {
-                    comparisons++;
-                    act[i] = j;
-                    act[j] = i;
-                    _Rbest_swaps(ref comparisons, ranks, size, ref best, ref bestvalue, ref act, i + 1);
-                    act[i] = -1;
-                    act[j] = -1;
-                }
+                data.actAssign[deept] = curr.Role;
+                _Rassign(data,deept+1);
             }
         }
     }

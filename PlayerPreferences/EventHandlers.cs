@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography.X509Certificates;
 using Smod2.EventHandlers;
 using Smod2.Events;
 using System.Text.RegularExpressions;
@@ -46,12 +47,17 @@ namespace PlayerPreferences
             Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
 
             plugin.Info("Calculating optimal starting player roles...");
-            AssignRoles(playerRoles);
+            AssignRoles(ref playerRoles);
             
             foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {
-                if(playerRole.Key.TeamRole.Role!=playerRole.Value)
+                
+                plugin.Debug($"{playerRole.Key.Name} is {playerRole.Key.TeamRole.Role} and should be {playerRole.Value}");
+                if (playerRole.Key.TeamRole.Role != playerRole.Value && playerRole.Value != Role.UNASSIGNED)
+                {
                     playerRole.Key.ChangeRole(playerRole.Value);
+                    plugin.Debug($"Setting {playerRole.Key.Name} to {playerRole.Value}");
+                }
             }
         }
 
@@ -336,33 +342,33 @@ namespace PlayerPreferences
             }
         }
 
-        private void AssignRoles(IDictionary<Player, Role> playerRoles)
+        private void AssignRoles( ref Dictionary<Player, Role> playerRoles)
         {
             
             Dictionary<Role,int> RoleCounter = new Dictionary<Role, int>();
            
-            PlayerData[] players = playerRoles.Select(x =>
-            {
-                if (!plugin.Preferences.Contains(x.Key.SteamId) && plugin.DistributeAll)
-                { //if distributing all add the role to availables
-                    if (RoleCounter.ContainsKey(x.Value))
-                        RoleCounter[x.Value]++;
-                    else
-                        RoleCounter.Add(x.Value, 1);
-                }
+            PlayerData[] players = playerRoles.Select(x => new PlayerData(x.Key,x.Value,plugin)).OrderBy(x=>x.Record==null).ToArray();
+            //order unranked to the bottom
 
-                return new PlayerData(x.Key,x.Value,plugin);
-            }).ToArray();
+            foreach (var player in players)
+            {
+                if (plugin.DistributeAll || player.Record!=null)
+                {
+                    if (RoleCounter.ContainsKey(player.Role))
+                        RoleCounter[player.Role]++;
+                    else
+                        RoleCounter.Add(player.Role, 1);
+                }
+            }
             
             _RData data = new _RData(players,RoleCounter);
 
-            _Rassign(data, 0);
+            _Rassign(ref data, 0);
 
             for (int i = 0; i < players.Length; i++)
             {
                 playerRoles[players[i].Player] = data.bestAssign[i];
             }
-            
             
             plugin.Info($"Roles set after {data.recursions} comparisons.");
         }
@@ -405,61 +411,83 @@ namespace PlayerPreferences
         {
             public int recursions;
             public PlayerData[] players;
-            public int size => players.Length;
+            public int size;
             public Dictionary<Role, int> roleCounter;
             public Role[] bestAssign;
             public float bestSum;
             public Role[] actAssign;
             public float actSum;
-
+            public bool result;
+            
             public _RData(PlayerData[] players, Dictionary<Role, int> roleCounter)
             {
                 this.players = players;
                 this.roleCounter = roleCounter;
-                bestAssign = new Role[players.Length];
-                actAssign = new Role[players.Length];
-                bestSum = 0;
+                bestAssign = Enumerable.Repeat(Role.UNASSIGNED,players.Length).ToArray();
+                actAssign = Enumerable.Repeat(Role.UNASSIGNED,players.Length).ToArray();
+                bestSum = -1;
                 actSum = 0;
+                result = false;
+                size = players.Length;
             }
         }
 
-        private void _Rassign(_RData data, int deept)
+        private bool _Rassign(ref _RData data, int deept)
         {
             if (deept == data.size)
             {
+                plugin.Debug($"sum={data.actSum}");
                 if (data.actSum > data.bestSum)
                 {
                     Array.Copy(data.actAssign,data.bestAssign,data.size);
+                    data.result = true;
                 }
-                return;
+                return false;
             }
+
+            //check max comparsions || at least one result required
+            if (data.recursions > plugin.MaxRoundStartComparisons && data.result)
+                return true;
 
             data.recursions++;
 
             PlayerData curr = data.players[deept];
 
+            Role[] array;
+            if (curr.Record != null) // if there are preferences loop starting from the highest ranked
+                array = curr.Record.Preferences;
+            else
+                array = data.roleCounter.Keys.ToArray();
+                 
+
             if (curr.Record != null || plugin.DistributeAll)
             {
-                foreach (var role in data.roleCounter.Keys)
-                {
-                    if (data.roleCounter[role] != 0)
+                    foreach (var role in array)
                     {
-                        float val =  data.players[deept].Record?.RoleRating(data.actAssign[deept])??0;
-                        data.actAssign[deept] = role;
-                        data.roleCounter[role]--;
-                        data.actSum += val;
-                        _Rassign(data,deept+1);
-                        data.roleCounter[role]++;
-                        data.actAssign[deept] = Role.UNASSIGNED;
-                        data.actSum -= val;
+                        if (data.roleCounter.ContainsKey(role) && data.roleCounter[role] > 0)
+                        {
+                            float val = data.players[deept].Record?.RoleRating(data.actAssign[deept]) ?? 0;
+                            
+                            plugin.Debug($"{curr.Player.Name} - {role} - {val}");
+                            data.actAssign[deept] = role;
+                            data.roleCounter[role]--;
+                            data.actSum += val;
+                            if (_Rassign(ref data, deept + 1)) //if true break directly
+                                return true;
+                            data.roleCounter[role]++;
+                            data.actAssign[deept] = Role.UNASSIGNED;
+                            data.actSum -= val;
+                        }
                     }
-                }
             }
             else
             {
                 data.actAssign[deept] = curr.Role;
-                _Rassign(data,deept+1);
+                if (_Rassign(ref data, deept + 1))
+                    return true;
             }
+
+            return false;
         }
     }
 }

@@ -47,18 +47,20 @@ namespace PlayerPreferences
             Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
 
             plugin.Info("Calculating optimal starting player roles...");
-            AssignRoles(ref playerRoles);
-            
+            AssignRoles(playerRoles,Role.CLASSD);
+            int changes = 0;
             foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {
                 
                 plugin.Debug($"{playerRole.Key.Name} is {playerRole.Key.TeamRole.Role} and should be {playerRole.Value}");
                 if (playerRole.Key.TeamRole.Role != playerRole.Value && playerRole.Value != Role.UNASSIGNED)
                 {
+                    changes++;
                     playerRole.Key.ChangeRole(playerRole.Value);
                     plugin.Debug($"Setting {playerRole.Key.Name} to {playerRole.Value}");
                 }
             }
+            plugin.Info($"Changed {changes} roles");
         }
 
         public void OnCallCommand(PlayerCallCommandEvent ev)
@@ -284,52 +286,42 @@ namespace PlayerPreferences
                 return;
             }
 
-            Dictionary<int,PlayerData> spectators = plugin.Server.GetPlayers()
-                .Where(x => x.TeamRole.Role == Role.SPECTATOR)
-                .Select(x => new PlayerData(x, Role.SPECTATOR, plugin))
-                .ToDictionary(x=>x.Player.PlayerId,x=>x);
-            Dictionary<int,Player> defaultUnrankedPlayers = ev.PlayerList
-                .Select(x => new PlayerData(x, Role.SPECTATOR, plugin))
-                .Where( x=> x.Record == null)
-                .Select(x=>x.Player)
-                .ToDictionary(x=>x.PlayerId,x=>x);
-
             plugin.Info("Calculating optimal team respawn roles...");
             if (ev.SpawnChaos)
             {
-                ev.PlayerList = RankedPlayers(spectators.Values, defaultUnrankedPlayers.Values, ev.PlayerList, Role.CHAOS_INSURGENCY,ev.PlayerList.Count).Take(ev.PlayerList.Count).ToList();
+                plugin.Info("Chaos Insurgency spawn, nothing to do");
             }
             else
             {
-                List<Player> mtf = new List<Player>();
-
-                Player commander = RankedPlayers(spectators.Values,defaultUnrankedPlayers.Values, ev.PlayerList.Take(1).ToList(), Role.NTF_COMMANDER,1).First();
-                mtf.Add(commander);
-
-                spectators.Remove(commander.PlayerId);
-                defaultUnrankedPlayers.Remove(commander.PlayerId);
-
-                int remainingMtf = ev.PlayerList.Count - 1;
-                if (remainingMtf > 0)
+                Dictionary<Player, Role> playerRoles = new Dictionary<Player, Role>();
+                int i = 0;
+                foreach (Player player in ev.PlayerList)
                 {
-                    int lieutenantCount = Mathf.Min(remainingMtf, 3);
-
-                    Player[] lieutenants = RankedPlayers(spectators.Values,defaultUnrankedPlayers.Values, ev.PlayerList.Skip(1).Take(3).ToList(), Role.NTF_LIEUTENANT,lieutenantCount).Take(lieutenantCount).ToArray();
-                    mtf.AddRange(lieutenants);
-                    
-                    foreach (Player lieutenant in lieutenants)
-                    {
-                        spectators.Remove(lieutenant.PlayerId);
-                        defaultUnrankedPlayers.Remove(lieutenant.PlayerId);
-                    }
-
-                    if ((remainingMtf -= lieutenantCount) > 0)
-                    {
-                        mtf.AddRange(RankedPlayers(spectators.Values,defaultUnrankedPlayers.Values, ev.PlayerList.Skip(4).ToList(), Role.NTF_CADET,remainingMtf).Take(remainingMtf));
-                    }
+                    if(i==0)
+                        playerRoles.Add(player,Role.NTF_COMMANDER);
+                    else if(i<=3)
+                        playerRoles.Add(player,Role.NTF_LIEUTENANT);
+                    else
+                        playerRoles.Add(player,Role.NTF_CADET);
+                    i++;
                 }
+                
+                AssignRoles(playerRoles,Role.NTF_CADET);
 
-                ev.PlayerList = mtf;
+                ev.PlayerList = playerRoles.OrderBy(x =>
+                {
+                    switch (x.Value)
+                    {
+                        case Role.NTF_COMMANDER:
+                            return 0;
+                        case Role.NTF_LIEUTENANT:
+                            return 1;
+                        case Role.NTF_CADET:
+                            return 2;
+                        default:
+                            return 3;
+                    }
+                }).Select(x => x.Key).ToList();
             }
             plugin.Info("Player roles set!");
         }
@@ -342,74 +334,96 @@ namespace PlayerPreferences
             }
         }
 
-        private void AssignRoles( ref Dictionary<Player, Role> playerRoles)
+        private void AssignRoles(Dictionary<Player, Role> playerRoles,Role defaultRole)
         {
             
             Dictionary<Role,int> RoleCounter = new Dictionary<Role, int>();
+            
            
-            PlayerData[] players = playerRoles.Select(x => new PlayerData(x.Key,x.Value,plugin)).OrderBy(x=>x.Record==null).ToArray();
-            //order unranked to the bottom
+            PlayerData[] players = playerRoles.Select(x => new PlayerData(x.Key,x.Value,plugin)).ToArray();
+            if (plugin.DistributeAll)
+                players = players.Reverse().ToArray();
 
             foreach (var player in players)
             {
                 if (plugin.DistributeAll || player.Record!=null)
                 {
+                    //add role to rolecount if the player can be swapped
                     if (RoleCounter.ContainsKey(player.Role))
                         RoleCounter[player.Role]++;
                     else
                         RoleCounter.Add(player.Role, 1);
                 }
             }
+
+            PlayerData[] ranked = players.Where(x => x.Record != null).ToArray();
+            List<PlayerData> unranked = players.Where(x => x.Record == null).ToList();
             
-            _RData data = new _RData(players,RoleCounter);
+            //calculate best assign for ranked players
+            _RData data = new _RData(ranked,RoleCounter);
 
             _Rassign(ref data, 0);
 
-            for (int i = 0; i < players.Length; i++)
+            if (data.result) //if players have been changed
             {
-                playerRoles[players[i].Player] = data.bestAssign[i];
+                for (int i = 0; i < ranked.Length; i++)
+                {
+                    playerRoles[ranked[i].Player] = data.bestAssign[i];
+                }
+
+                //remove empty roles
+                foreach (KeyValuePair<Role, int> pair in RoleCounter)
+                {
+                    if (pair.Value == 0)
+                        RoleCounter.Remove(pair.Key);
+                }
+
+                //if there are still roles to assign ( DistributeAll )
+                if (RoleCounter.Count > 0)
+                {
+                    //if the unranked can have it's original role leave it
+                    foreach (PlayerData player in unranked)
+                    {
+                        if (RoleCounter.ContainsKey(player.Role))
+                        {
+                            unranked.Remove(player);
+                            RoleCounter[player.Role]--;
+                            if (RoleCounter[player.Role] == 0)
+                                RoleCounter.Remove(player.Role);
+                        }
+                    }
+
+                    //for the remains give them the first non empty role in the list
+                    foreach (var player in unranked)
+                    {
+                        Role role = RoleCounter.Keys.DefaultIfEmpty(defaultRole).FirstOrDefault();
+                        playerRoles[player.Player] = role;
+                        RoleCounter[role]--;
+                        if (RoleCounter[role] == 0)
+                            RoleCounter.Remove(role);
+                    }
+                }
             }
-            
-            plugin.Info($"Roles set after {data.recursions} comparisons.");
-        }
 
-        private IEnumerable<Player> RankedPlayers(IEnumerable<PlayerData> rankablePlayers,IEnumerable<Player> defaultUnrankedPlayers, IReadOnlyCollection<Player> defaultPlayers, Role role, int size)
-        {
-            Player[] ranked = rankablePlayers
-                .ToDictionary(x => x, x => x.Record?.RoleRating(role))
-                .Where(x => x.Value.HasValue)
-                .OrderByDescending(x => x.Value.Value)
-                .Take(defaultPlayers.Count)
-                .Select(x => x.Key.Player)
-                .ToArray();
-            int rankedIndex = 0;
-            int unrankedIndex = 0;
-
-            int count = 0;
-            
-            foreach (Player player in defaultPlayers)
+            float rating = 100;
+            if (data.result)
             {
-                if(count>size)
-                    break;
-                count++;
-                if (!plugin.Preferences.Contains(player.SteamId) && !plugin.DistributeAll)
-                {
-                    yield return player;
-                }
-                else if (rankedIndex < ranked.Length)
-                {
-                    yield return ranked[rankedIndex++];
-                }
+                rating = data.bestSum * 100  / (plugin.Preferences.Records.FirstOrDefault()?.Preferences.Length??18);
+                if (plugin.DistributeAll)
+                    rating /= players.Length;
                 else
-                {
-                    yield return defaultUnrankedPlayers.ToArray()[unrankedIndex++];
-                }
+                    rating /= players.Count(x => x.Record != null);
+
             }
+
+            plugin.Info($"Roles set after {data.tryes} tryes.");
+            plugin.Info($"Ranked players {players.Count(x => x.Record != null)}");
+            plugin.Info($"Rating: {rating}%");
         }
-        
+
         private class _RData
         {
-            public int recursions;
+            public int tryes;
             public PlayerData[] players;
             public int size;
             public Dictionary<Role, int> roleCounter;
@@ -440,17 +454,15 @@ namespace PlayerPreferences
                 if (data.actSum > data.bestSum)
                 {
                     Array.Copy(data.actAssign,data.bestAssign,data.size);
+                    data.bestSum = data.actSum;
                     data.result = true;
                 }
+                //check max comparsions || at least one result required
+                if (data.tryes++ > plugin.MaxRoundStartComparisons)
+                    return true;
                 return false;
             }
-
-            //check max comparsions || at least one result required
-            if (data.recursions > plugin.MaxRoundStartComparisons && data.result)
-                return true;
-
-            data.recursions++;
-
+            
             PlayerData curr = data.players[deept];
 
             Role[] array;
@@ -466,7 +478,7 @@ namespace PlayerPreferences
                     {
                         if (data.roleCounter.ContainsKey(role) && data.roleCounter[role] > 0)
                         {
-                            float val = data.players[deept].Record?.RoleRating(data.actAssign[deept]) ?? 0;
+                            float val = data.players[deept].Record?[role] ?? 0;
                             
                             plugin.Debug($"{curr.Player.Name} - {role} - {val}");
                             data.actAssign[deept] = role;

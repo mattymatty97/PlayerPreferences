@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using JetBrains.Annotations;
 using Smod2.API;
 
 namespace PlayerPreferences
@@ -39,8 +40,7 @@ namespace PlayerPreferences
             }
         }
         
-        private int[] Rpreferences;
-        public int[] RPreferences => Rpreferences;
+        [CanBeNull] private Dictionary<Role,int> Rpreferences;
 
         private Role[] preferences;
         public Role[] Preferences
@@ -52,10 +52,10 @@ namespace PlayerPreferences
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), "Length does not match the length of all preference roles.");
                 }
-                Rpreferences = new int[18];
+                Rpreferences = new Dictionary<Role, int>();
                 for (int i = 0; i < value.Length; i++)
                 {
-                    Rpreferences[(int) value[i]] = i+1;
+                    Rpreferences.Add(value[i],i+1);
                 }
                 preferences = value;
                 Write();
@@ -72,21 +72,7 @@ namespace PlayerPreferences
             }
         }
 
-        public int? this[Role role]
-        {
-            get
-            {
-                for (int i = 0; i < preferences.Length; i++)
-                {
-                    if (preferences[i] == role)
-                    {
-                        return i;
-                    }
-                }
-
-                return null;
-            }
-        }
+        public int? this[Role role] => Rpreferences?[role];
 
         public void UpdateAverage(int rankAddition)
         {

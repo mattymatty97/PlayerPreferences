@@ -166,23 +166,15 @@ namespace PlayerPreferences
 
                                 Role newRole = PpPlugin.GetRole(args[1]);
 
-                                int curIndex = -1;
-                                for (int i = 0; i < record.Preferences.Length; i++)
-                                {
-                                    if (record.Preferences[i] == newRole)
-                                    {
-                                        curIndex = i;
-                                        break;
-                                    }
-                                }
+                                int oldPos = record[record[rank]]??0;
 
                                 Role existingRole = record[rank];
 
                                 record[rank] = newRole;
-                                record[curIndex] = existingRole;
+                                record[oldPos] = existingRole;
 
                                 ev.ReturnMessage = "\n" +
-                                                   $"Updated role rank of {PpPlugin.RoleNames[newRole]} to {rank + 1} and moved {PpPlugin.RoleNames[existingRole]} to {curIndex + 1}.";
+                                                   $"Updated role rank of {PpPlugin.RoleNames[newRole]} to {rank + 1} and moved {PpPlugin.RoleNames[existingRole]} to {oldPos + 1}.";
                                 return;
                         }
                     }
@@ -293,6 +285,7 @@ namespace PlayerPreferences
             }
             else
             {
+                plugin.Info("NTF spawn, Calculating...");
                 Dictionary<Player, Role> playerRoles = new Dictionary<Player, Role>();
                 int i = 0;
                 foreach (Player player in ev.PlayerList)
@@ -322,8 +315,8 @@ namespace PlayerPreferences
                             return 3;
                     }
                 }).Select(x => x.Key).ToList();
+                plugin.Info("Player roles set!");
             }
-            plugin.Info("Player roles set!");
         }
 
         public void OnSetConfig(SetConfigEvent ev)

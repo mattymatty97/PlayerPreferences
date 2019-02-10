@@ -68,6 +68,12 @@ namespace PlayerPreferences
             set
             {
                 preferences[rank] = value;
+                if (Rpreferences == null)
+                {
+                    Rpreferences = new Dictionary<Role, int> {{value, rank}};
+                }
+                else
+                    Rpreferences[value] = rank;
                 Write();
             }
         }

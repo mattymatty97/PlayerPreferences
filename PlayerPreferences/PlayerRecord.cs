@@ -39,8 +39,6 @@ namespace PlayerPreferences
                 return null;
             }
         }
-        
-        [CanBeNull] private Dictionary<Role,int> Rpreferences;
 
         private Role[] preferences;
         public Role[] Preferences
@@ -51,11 +49,6 @@ namespace PlayerPreferences
                 if (value.Length != PpPlugin.Roles.Count)
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), "Length does not match the length of all preference roles.");
-                }
-                Rpreferences = new Dictionary<Role, int>();
-                for (int i = 0; i < value.Length; i++)
-                {
-                    Rpreferences.Add(value[i],i+1);
                 }
                 preferences = value;
                 Write();
@@ -68,17 +61,19 @@ namespace PlayerPreferences
             set
             {
                 preferences[rank] = value;
-                if (Rpreferences == null)
-                {
-                    Rpreferences = new Dictionary<Role, int> {{value, rank}};
-                }
-                else
-                    Rpreferences[value] = rank;
                 Write();
             }
         }
 
-        public int? this[Role role] => Rpreferences?[role];
+        public int? this[Role role] {
+            get
+            {
+                for (int i = 0; i < preferences.Length; i++)
+                    if (preferences[i] == role)
+                        return preferences.Length-i;
+                return null;
+            }
+        }
 
         public void UpdateAverage(int rankAddition)
         {

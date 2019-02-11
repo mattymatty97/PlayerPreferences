@@ -56,16 +56,9 @@ namespace PlayerPreferences
                 plugin.Debug($"{playerRole.Key.Name} is {playerRole.Key.TeamRole.Role} and should be {playerRole.Value}");
                 if (playerRole.Key.TeamRole.Role != playerRole.Value && playerRole.Value != Role.UNASSIGNED)
                 {
-                    if (ev.Server.GetPlayers().Contains(playerRole.Key))
-                    {
-                        changes++;
-                        playerRole.Key.ChangeRole(playerRole.Value);
-                        plugin.Debug($"Setting {playerRole.Key.Name} to {playerRole.Value}");
-                    }
-                    else
-                    {
-                        plugin.Info($"Player {playerRole.Key.Name} Disconnected too early");
-                    }
+                    changes++;
+                    playerRole.Key.ChangeRole(playerRole.Value);
+                    plugin.Debug($"Setting {playerRole.Key.Name} to {playerRole.Value}");
                 }
             }
             plugin.Info($"Changed {changes} roles");
@@ -174,7 +167,10 @@ namespace PlayerPreferences
 
                                 Role newRole = PpPlugin.GetRole(args[1]);
 
-                                int oldPos = record[record[rank]]??0;
+                                int oldPos = 0;
+                                for(int i=0; i<record.Preferences.Length;i++)
+                                    if (record[i] == newRole)
+                                        oldPos = i;
 
                                 Role existingRole = record[rank];
 
@@ -340,98 +336,117 @@ namespace PlayerPreferences
             List<PlayerData> players = playerRoles.Where(x=>!x.Key.OverwatchMode).Where(x=>x.Value!=Role.UNASSIGNED).Select(x => new PlayerData(x.Key,x.Value,plugin)).ToList();
            
             
-            PlayerData[] ranked = players.Where(x => x.Record != null).ToArray();
-            PlayerData[] unranked = players.Where(x => x.Record == null).ToArray();
+            PlayerData[] ranked = players.Where(x => x.Record != null).DefaultIfEmpty(null).ToArray();
+            PlayerData[] unranked = players.Where(x => x.Record == null).DefaultIfEmpty(null).ToArray();
 
-            var swappables = plugin.DistributeAll ? players.ToArray() : ranked;
-            
-            int[] RoleCounter = new int[19];
+            if (ranked[0] != null)
+            {
+                var swappables = plugin.DistributeAll ? players.ToArray() : ranked;
 
-            foreach (var player in swappables)
-            {
-               //add role to rolecount if the player can be swapped
-               RoleCounter[(int) player.Role + 1 ]++;
-            }
-            
-            //calculate best assign for ranked players
-            _RData data = new _RData(ranked,RoleCounter);
-            
-            
-            _Rassign(ref data, 0);
-            
-           
-            if (data.result) //if players might have been changed
-            {
-                for (int i = 0; i < ranked.Length; i++) //for each ranked player remove it's correspondig role
+                int[] RoleCounter = new int[19];
+
+                foreach (var player in swappables)
                 {
-                    if (playerRoles.ContainsKey(ranked[i].Player))
-                    {
-                        Role assign = data.bestAssign[i];
-                        playerRoles[ranked[i].Player] = assign;
-                        RoleCounter[(int) assign + 1 ]--;
-                    }
+                    //add role to rolecount if the player can be swapped
+                    RoleCounter[(int) player.Role + 1]++;
                 }
+
+                plugin.Debug($"Role counter = {{{string.Join(",", RoleCounter)}}}");
+                //calculate best assign for ranked players
+
+                _RData data = new _RData(ranked, RoleCounter);
                 
-                //if there are still roles to assign ( DistributeAll )
-                if (plugin.DistributeAll)
-                {
-                    //if the unranked can have it's original role leave it
-                    bool[] assigned = new bool[unranked.Length];
-                    for (int i =0 ; i< unranked.Length ; i++)
+                if(ranked.Length > 0 )
+                    if (ranked.Length > 1 || plugin.DistributeAll)
                     {
-                        var player = unranked[i];
-                        if (RoleCounter[(int) player.Role + 1 ]>0 && !assigned[i])
+                        _Rassign(ref data, 0);
+                    }
+
+                if (data.result) //if players might have been changed
+                {
+                    plugin.Debug($"Best Assign = {{{string.Join(",", data.bestAssign)}}}");
+                    for (int i = 0; i < ranked.Length; i++) //for each ranked player remove it's corresponding role
+                    {
+                        if (playerRoles.ContainsKey(ranked[i].Player))
                         {
-                            assigned[i] = true;
-                            RoleCounter[(int) player.Role + 1 ]--;
+                            Role assign = data.bestAssign[i];
+                            playerRoles[ranked[i].Player] = assign;
+                            RoleCounter[(int) assign + 1]--;
                         }
                     }
-                    
-                    //for the remains give them the first non empty role in the list
-                    for (int i =0 ; i< unranked.Length ; i++)
-                    {
-                        var player = unranked[i];
-                        if (!assigned[i])
-                        {
-                            Role role = defaultRole;
-                            //ignore Role.UNASSIGNED
-                            for (int j = 1; j < 19; j++)
-                            {
-                                if (RoleCounter[j] > 0)
-                                {
-                                    role = (Role) j - 1;
-                                    break;
-                                }
 
+                    plugin.Debug($"Role counter = {{{string.Join(",", RoleCounter)}}}");
+                    
+                    //if there are unranked players
+                    if (unranked[0] != null)
+                    {
+                        //if there are still roles to assign ( DistributeAll )
+                        if (plugin.DistributeAll)
+                        {
+                            //if the unranked can have it's original role leave it
+                            bool[] assigned = new bool[unranked.Length];
+                            for (int i = 0; i < unranked.Length; i++)
+                            {
+                                var player = unranked[i];
+                                if (RoleCounter[(int) player.Role + 1] > 0 && !assigned[i])
+                                {
+                                    assigned[i] = true;
+                                    RoleCounter[(int) player.Role + 1]--;
+                                }
                             }
 
-                            if (playerRoles.ContainsKey(player.Player))
+                            //for the remains give them the first non empty role in the list
+                            for (int i = 0; i < unranked.Length; i++)
                             {
-                                playerRoles[player.Player] = role;
-                                if (RoleCounter[(int) role + 1] > 0)
+                                var player = unranked[i];
+                                if (!assigned[i])
                                 {
-                                    RoleCounter[(int) role + 1]--;
+                                    Role role = defaultRole;
+                                    //ignore Role.UNASSIGNED
+                                    for (int j = 1; j < 19; j++)
+                                    {
+                                        if (RoleCounter[j] > 0)
+                                        {
+                                            role = (Role) j - 1;
+                                            break;
+                                        }
+
+                                    }
+
+                                    if (playerRoles.ContainsKey(player.Player))
+                                    {
+                                        playerRoles[player.Player] = role;
+                                        if (RoleCounter[(int) role + 1] > 0)
+                                        {
+                                            RoleCounter[(int) role + 1]--;
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            float rating = 100;
-            if (data.result)
+                float rating = 100;
+                if (data.result)
+                {
+                    rating = data.bestSum * 100f / 14f;
+                    if (plugin.DistributeAll)
+                        rating /= players.Count;
+                    else
+                        rating /= ranked.Length;
+
+                }
+
+                plugin.Info($"Roles set after {data.tryes} tests.");
+                plugin.Info($"Ranked players {ranked.Length}");
+                plugin.Info($"Rating: {rating}%");
+
+            }
+            else
             {
-                rating = data.bestSum * 100  / 18;
-                if (plugin.DistributeAll)
-                    rating /= players.Count;
-                else
-                    rating /= ranked.Length;
-
+                plugin.Info("Nothing to do, no ranked players");
             }
-
-            plugin.Info($"Roles set after {data.tryes} tryes.");
-            plugin.Info($"Ranked players {players.Count(x => x.Record != null)}");
-            plugin.Info($"Rating: {rating}%");
         }
 
         private class _RData
@@ -482,12 +497,13 @@ namespace PlayerPreferences
             }
             
             PlayerData curr = data.players[deept];
+            
 
             foreach (var role in curr.Record.Preferences.Reverse())
             {
                 if (data.roleCounter[(int) role +1]>0)
                 {
-                    int val = data.players[deept].Record?[role] ?? -100;
+                    int val = curr.Record[role]??0;
                     plugin.Debug($"{curr.Player.Name} - {role} - {val}");
                     data.actAssign[deept] = role;
                     data.roleCounter[(int) role + 1]--;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -55,9 +56,16 @@ namespace PlayerPreferences
                 plugin.Debug($"{playerRole.Key.Name} is {playerRole.Key.TeamRole.Role} and should be {playerRole.Value}");
                 if (playerRole.Key.TeamRole.Role != playerRole.Value && playerRole.Value != Role.UNASSIGNED)
                 {
-                    changes++;
-                    playerRole.Key.ChangeRole(playerRole.Value);
-                    plugin.Debug($"Setting {playerRole.Key.Name} to {playerRole.Value}");
+                    if (ev.Server.GetPlayers().Contains(playerRole.Key))
+                    {
+                        changes++;
+                        playerRole.Key.ChangeRole(playerRole.Value);
+                        plugin.Debug($"Setting {playerRole.Key.Name} to {playerRole.Value}");
+                    }
+                    else
+                    {
+                        plugin.Info($"Player {playerRole.Key.Name} Disconnected too early");
+                    }
                 }
             }
             plugin.Info($"Changed {changes} roles");
@@ -93,14 +101,14 @@ namespace PlayerPreferences
                         {
                             case "hash" when args[1].Length != PpPlugin.Roles.Count:
                                 ev.ReturnMessage = "\n" +
-                                                   "Invalid hash length. Are you sure thats the full hash? Is the hash from an outdated server?";
+                                                   "Lunghezza invalida dell'hash. Sei sicuro che sia l'intero Hash? E' un Hash proveniente da un server obsoleto";
                                 return;
 
                             case "hash":
                                 if (ev.Player.DoNotTrack)
                                 {
                                     ev.ReturnMessage = "\n" +
-                                                       "Looks like you've got \"do not track\" enabled. If you want to use role preferences, please disable do not track.";
+                                                       "Sembra che tu abbia \"do not track\" abilitato. Se si vuole utilizzare le preferenze di ruolo, assicurati di disabilitare il do not track.";
                                     return;
                                 }
 
@@ -127,7 +135,7 @@ namespace PlayerPreferences
                                 if (invalid || roles.Length != roles.Distinct().Count())
                                 {
                                     ev.ReturnMessage = "\n" +
-                                                       "Invalid hash. Is the hash from an outdated server?";
+                                                       "Hash invalido. E' un Hash proveniente da un server obsoleto?";
                                     return;
                                 }
 
@@ -135,13 +143,13 @@ namespace PlayerPreferences
                                 {
                                     plugin.Preferences[ev.Player.SteamId].Preferences = roles;
                                     ev.ReturnMessage = "\n" +
-                                                       "Preferences set.";
+                                                       "Le preferenze sono state settate.";
                                 }
                                 else
                                 {
                                     plugin.Preferences.Add(ev.Player.SteamId, roles);
                                     ev.ReturnMessage = "\n" +
-                                                       "Preferences created and set.";
+                                                       "Preferenze create e settate.";
                                 }
                                 return;
 
@@ -149,14 +157,14 @@ namespace PlayerPreferences
                                 if (!plugin.Preferences.Contains(ev.Player.SteamId))
                                 {
                                     ev.ReturnMessage = "\n" +
-                                                       "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                                                       "Non hai nessuna preferenza di ruolo. Avvia \".prefs create\" per rigenerare le tue preferenze e utilizzare nuovamente le preferenze di ruolo.";
                                     return;
                                 }
 
                                 if (!int.TryParse(args[0], out int rank) || rank > PpPlugin.Roles.Count)
                                 {
                                     ev.ReturnMessage = "\n" +
-                                                       "Invalid rank number.";
+                                                       "Numero della posizione non valido.";
                                     return;
                                 }
                                 // Correct index (since menu starts at 1)
@@ -174,7 +182,7 @@ namespace PlayerPreferences
                                 record[oldPos] = existingRole;
 
                                 ev.ReturnMessage = "\n" +
-                                                   $"Updated role rank of {PpPlugin.RoleNames[newRole]} to {rank + 1} and moved {PpPlugin.RoleNames[existingRole]} to {oldPos + 1}.";
+                                                   $"Posizione del ruolo aggiornata da {PpPlugin.RoleNames[newRole]} a {rank + 1} e spostato {PpPlugin.RoleNames[existingRole]} a {oldPos + 1}.";
                                 return;
                         }
                     }
@@ -182,24 +190,23 @@ namespace PlayerPreferences
                     switch (args[0])
                     {
                         case "help":
-                            ev.ReturnMessage = "\n" +
-                                               " // Player Preferences by Androx //\n" +
+                            ev.ReturnMessage = "\n" +" // Player Preferences by Androx //\n" +
                                                "\n" +
-                                               ".prefs             - Gets all ranks with their corresponding roles.\n" +
-                                               ".prefs help        - Shows you this page you big dumb.\n" +
-                                               ".prefs create      - Generates preferences and unlocks commands.\n" +
-                                               ".prefs delete      - Deletes preference data with your account.\n" +
-                                               ".prefs [#] [role]  - Sets role respawn priority (1 is the highest).\n" +
-                                               ".prefs hash        - Gives hash of current preferences.\n" +
-                                               ".prefs hash [hash] - Sets preferences to the specified hash.\n" +
-                                               ".prefs average     - Displays your average rank.";
+                                               ".prefs             - Ottieni tutte le posizioni con i loro ruoli corrispondenti.\n" +
+                                               ".prefs help        - Ti mostra questa pagina idiota.\n" +
+                                               ".prefs create      - Genera preferenze casuali e sblocca i comandi.\n" +
+                                               ".prefs delete      - Elimina i dati delle preferenze dal tuo account.\n" +
+                                               ".prefs [#] [ruolo] - Imposta la posizione del ruolo (1 è il più alto).\n" +
+                                               ".prefs hash        - Fornisce hash delle preferenze correnti.\n" +
+                                               ".prefs hash [hash] - Imposta le preferenze sull'hash specificato." + 
+                                               ".prefs average     - Mostra la tua media di soddisfazione";
                             return;
 
                         case "create" when !plugin.Preferences.Contains(ev.Player.SteamId): {
                             if (ev.Player.DoNotTrack)
                             {
                                 ev.ReturnMessage = "\n" +
-                                                   "Looks like you've got \"do not track\" enabled. If you want to use role preferences, please disable do not track.";
+                                                   "Sembra che tu abbia \"do not track\" abilitato. Se vuoi utilizzare le preferenze di ruolo, disabilita do not track.";
                                 return;
                             }
 
@@ -209,50 +216,50 @@ namespace PlayerPreferences
                             plugin.Preferences.Add(ev.Player.SteamId, myRoles);
 
                             ev.ReturnMessage = "\n" +
-                                               "Created random role preferences. Use \".prefs delete\" to delete them.";
-                            return;
+                                               "Preferenze casuali create. Utilizzare \".Prefs delete\" per eliminarle o \".prefs [#] [role]\" per riordinarle";
+                            break;
                         }
 
                         case "create":
                             ev.ReturnMessage = "\n" +
-                                               "You already have role preferences. Use \".prefs delete\" to delete them.";
-                            return;
+                                               "Hai già preferenze di ruolo. Usa \".prefs delete\" per eliminarle  o \".prefs [#] [role]\" per riordinarle";
+                            break;
 
                         case "delete" when !plugin.Preferences.Contains(ev.Player.SteamId):
                             ev.ReturnMessage = "\n" +
-                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                                               "Non hai nessuna preferenza di ruolo. Esegui \".prefs create\" per rigenerare le tue preferenze e utilizzare nuovamente le preferenze di ruolo.";
                             return;
 
                         case "delete":
                             plugin.Preferences.Remove(ev.Player.SteamId);
 
                             ev.ReturnMessage = "\n" +
-                                               "Deleted role preferences. Run \".prefs create\" command to regenerate your preferences and use role preferences again.";
+                                               "Preferenze di ruolo cancellate. Avvia \".prefs create\" per rigenerare le tue preferenze e utilizzare nuovamente le preferenze di ruolo.";
                             return;
 
                         case "hash" when !plugin.Preferences.Contains(ev.Player.SteamId):
                             ev.ReturnMessage = "\n" +
-                                               "You have no role preferences. If you mean to set your preferences with a hash, please use \".prefs hash [generated hash]\" instead.";
+                                               "Non hai nessuna preferenza di ruolo. Se intendi settare le tue preferenze con un hash, usa invece \".prefs hash [generated hash]\".";
                             return;
 
                         case "hash":
                             ev.ReturnMessage = "\n" +
-                                               $"Your role preferences hash: {string.Join("", plugin.Preferences[ev.Player.SteamId].Preferences.Select(x => PpPlugin.RoleToInt[x].ToString("X"))).ToLower()}";
+                                               $"Il tuo hash delle preferenze di ruolo: {string.Join("", plugin.Preferences[ev.Player.SteamId].Preferences.Select(x => PpPlugin.RoleToInt[x].ToString("X"))).ToLower()}";
                             return;
                             
                         case "average" when !plugin.Preferences.Contains(ev.Player.SteamId):
                             ev.ReturnMessage = "\n" +
-                                               "You have no role preferences. Run \".prefs create\" to regenerate your preferences and use role preferences again.";
+                                               "Non hai nessuna preferenza di ruolo. Esegui \".prefs create\" per rigenerare le tue preferenze e utilizzare nuovamente le preferenze di ruolo.";
                             return;
                             
                         case "average":
                             ev.ReturnMessage = "\n" +
-                                               $"Your average rank is {Mathf.Round(plugin.Preferences[ev.Player.SteamId].AverageRank * 100) / 100}.";
+                                               $"La tua media è {Mathf.Round(plugin.Preferences[ev.Player.SteamId].AverageRank * 100) / 100}.";
                             return;
 
                         default:
                             ev.ReturnMessage = "\n" +
-                                               "Invalid argument. Please run \".prefs help\" for a full list of commands.";
+                                               "Argomento non valido. Esegui \".prefs help\" per una lista completa di comandi.";
                             return;
                     }
                 }
@@ -262,12 +269,12 @@ namespace PlayerPreferences
                     int i = 1;
                     ev.ReturnMessage = "\n" +
                                        $"{string.Join("\n", plugin.Preferences[ev.Player.SteamId].Preferences.Select(x => $"{i++} - {PpPlugin.RoleNames[x]}"))}\n" +
-                                       "Use \".prefs help\" for additional command info.";
+                                       "Usa \".prefs help\" per ulteriori informazioni sui comandi.";
                     return;
                 }
 
                 ev.ReturnMessage = "\n" +
-                                   "You have not created your preferences yet. To do so, use \".prefs create\"";
+                                   "Non hai ancora creato le tue preferenze. Per farlo, usa \".prefs create\"";
             }
         }
 
@@ -329,71 +336,84 @@ namespace PlayerPreferences
 
         private void AssignRoles(Dictionary<Player, Role> playerRoles,Role defaultRole)
         {
-            
-            Dictionary<Role,int> RoleCounter = new Dictionary<Role, int>();
-            
            
-            PlayerData[] players = playerRoles.Select(x => new PlayerData(x.Key,x.Value,plugin)).ToArray();
-            if (plugin.DistributeAll)
-                players = players.Reverse().ToArray();
-
-            foreach (var player in players)
-            {
-                if (plugin.DistributeAll || player.Record!=null)
-                {
-                    //add role to rolecount if the player can be swapped
-                    if (RoleCounter.ContainsKey(player.Role))
-                        RoleCounter[player.Role]++;
-                    else
-                        RoleCounter.Add(player.Role, 1);
-                }
-            }
-
+            List<PlayerData> players = playerRoles.Where(x=>!x.Key.OverwatchMode).Where(x=>x.Value!=Role.UNASSIGNED).Select(x => new PlayerData(x.Key,x.Value,plugin)).ToList();
+           
+            
             PlayerData[] ranked = players.Where(x => x.Record != null).ToArray();
-            List<PlayerData> unranked = players.Where(x => x.Record == null).ToList();
+            PlayerData[] unranked = players.Where(x => x.Record == null).ToArray();
+
+            var swappables = plugin.DistributeAll ? players.ToArray() : ranked;
+            
+            int[] RoleCounter = new int[19];
+
+            foreach (var player in swappables)
+            {
+               //add role to rolecount if the player can be swapped
+               RoleCounter[(int) player.Role + 1 ]++;
+            }
             
             //calculate best assign for ranked players
             _RData data = new _RData(ranked,RoleCounter);
-
+            
+            
             _Rassign(ref data, 0);
-
-            if (data.result) //if players have been changed
+            
+           
+            if (data.result) //if players might have been changed
             {
-                for (int i = 0; i < ranked.Length; i++)
+                for (int i = 0; i < ranked.Length; i++) //for each ranked player remove it's correspondig role
                 {
-                    playerRoles[ranked[i].Player] = data.bestAssign[i];
+                    if (playerRoles.ContainsKey(ranked[i].Player))
+                    {
+                        Role assign = data.bestAssign[i];
+                        playerRoles[ranked[i].Player] = assign;
+                        RoleCounter[(int) assign + 1 ]--;
+                    }
                 }
-
-                //remove empty roles
-                foreach (KeyValuePair<Role, int> pair in RoleCounter)
-                {
-                    if (pair.Value == 0)
-                        RoleCounter.Remove(pair.Key);
-                }
-
+                
                 //if there are still roles to assign ( DistributeAll )
-                if (RoleCounter.Count > 0)
+                if (plugin.DistributeAll)
                 {
                     //if the unranked can have it's original role leave it
-                    foreach (PlayerData player in unranked)
+                    bool[] assigned = new bool[unranked.Length];
+                    for (int i =0 ; i< unranked.Length ; i++)
                     {
-                        if (RoleCounter.ContainsKey(player.Role))
+                        var player = unranked[i];
+                        if (RoleCounter[(int) player.Role + 1 ]>0 && !assigned[i])
                         {
-                            unranked.Remove(player);
-                            RoleCounter[player.Role]--;
-                            if (RoleCounter[player.Role] == 0)
-                                RoleCounter.Remove(player.Role);
+                            assigned[i] = true;
+                            RoleCounter[(int) player.Role + 1 ]--;
                         }
                     }
-
+                    
                     //for the remains give them the first non empty role in the list
-                    foreach (var player in unranked)
+                    for (int i =0 ; i< unranked.Length ; i++)
                     {
-                        Role role = RoleCounter.Keys.DefaultIfEmpty(defaultRole).FirstOrDefault();
-                        playerRoles[player.Player] = role;
-                        RoleCounter[role]--;
-                        if (RoleCounter[role] == 0)
-                            RoleCounter.Remove(role);
+                        var player = unranked[i];
+                        if (!assigned[i])
+                        {
+                            Role role = defaultRole;
+                            //ignore Role.UNASSIGNED
+                            for (int j = 1; j < 19; j++)
+                            {
+                                if (RoleCounter[j] > 0)
+                                {
+                                    role = (Role) j - 1;
+                                    break;
+                                }
+
+                            }
+
+                            if (playerRoles.ContainsKey(player.Player))
+                            {
+                                playerRoles[player.Player] = role;
+                                if (RoleCounter[(int) role + 1] > 0)
+                                {
+                                    RoleCounter[(int) role + 1]--;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -401,11 +421,11 @@ namespace PlayerPreferences
             float rating = 100;
             if (data.result)
             {
-                rating = data.bestSum * 100  / (plugin.Preferences.Records.FirstOrDefault()?.Preferences.Length??18);
+                rating = data.bestSum * 100  / 18;
                 if (plugin.DistributeAll)
-                    rating /= players.Length;
+                    rating /= players.Count;
                 else
-                    rating /= players.Count(x => x.Record != null);
+                    rating /= ranked.Length;
 
             }
 
@@ -419,17 +439,21 @@ namespace PlayerPreferences
             public int tryes;
             public PlayerData[] players;
             public int size;
-            public Dictionary<Role, int> roleCounter;
+            public int[] bestRoleCounter;
             public Role[] bestAssign;
-            public float bestSum;
+            public int bestSum;
+            public int[] roleCounter;
             public Role[] actAssign;
-            public float actSum;
+            public int actSum;
             public bool result;
             
-            public _RData(PlayerData[] players, Dictionary<Role, int> roleCounter)
+            public _RData(PlayerData[] players, int[] roleCounter)
             {
                 this.players = players;
-                this.roleCounter = roleCounter;
+                this.roleCounter = new int[19];
+                this.bestRoleCounter = new int[19];
+                Array.Copy(roleCounter,this.roleCounter,roleCounter.Length);
+                Array.Copy(roleCounter,this.bestRoleCounter,roleCounter.Length);
                 bestAssign = Enumerable.Repeat(Role.UNASSIGNED,players.Length).ToArray();
                 actAssign = Enumerable.Repeat(Role.UNASSIGNED,players.Length).ToArray();
                 bestSum = -1;
@@ -447,10 +471,11 @@ namespace PlayerPreferences
                 if (data.actSum > data.bestSum)
                 {
                     Array.Copy(data.actAssign,data.bestAssign,data.size);
+                    Array.Copy(data.roleCounter,data.bestRoleCounter,data.roleCounter.Length);
                     data.bestSum = data.actSum;
                     data.result = true;
                 }
-                //check max comparsions || at least one result required
+                //check max comparisons || at least one result required
                 if (data.tryes++ > plugin.MaxRoundStartComparisons)
                     return true;
                 return false;
@@ -458,38 +483,21 @@ namespace PlayerPreferences
             
             PlayerData curr = data.players[deept];
 
-            Role[] array;
-            if (curr.Record != null) // if there are preferences loop starting from the highest ranked
-                array = curr.Record.Preferences;
-            else
-                array = data.roleCounter.Keys.ToArray();
-                 
-
-            if (curr.Record != null || plugin.DistributeAll)
+            foreach (var role in curr.Record.Preferences.Reverse())
             {
-                    foreach (var role in array)
-                    {
-                        if (data.roleCounter.ContainsKey(role) && data.roleCounter[role] > 0)
-                        {
-                            float val = data.players[deept].Record?[role] ?? 0;
-                            
-                            plugin.Debug($"{curr.Player.Name} - {role} - {val}");
-                            data.actAssign[deept] = role;
-                            data.roleCounter[role]--;
-                            data.actSum += val;
-                            if (_Rassign(ref data, deept + 1)) //if true break directly
-                                return true;
-                            data.roleCounter[role]++;
-                            data.actAssign[deept] = Role.UNASSIGNED;
-                            data.actSum -= val;
-                        }
-                    }
-            }
-            else
-            {
-                data.actAssign[deept] = curr.Role;
-                if (_Rassign(ref data, deept + 1))
-                    return true;
+                if (data.roleCounter[(int) role +1]>0)
+                {
+                    int val = data.players[deept].Record?[role] ?? -100;
+                    plugin.Debug($"{curr.Player.Name} - {role} - {val}");
+                    data.actAssign[deept] = role;
+                    data.roleCounter[(int) role + 1]--;
+                    data.actSum += val;
+                    if (_Rassign(ref data, deept + 1)) //if true break directly
+                        return true;
+                    data.roleCounter[(int) role + 1]++;
+                    data.actAssign[deept] = Role.UNASSIGNED;
+                    data.actSum -= val;
+                }
             }
 
             return false;

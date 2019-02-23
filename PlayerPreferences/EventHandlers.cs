@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace PlayerPreferences
 {
-    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerSetConfig, IEventHandlerWaitingForPlayers, IEventHandlerRoundStart, IEventHandlerTeamRespawn
+    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerSetConfig, IEventHandlerWaitingForPlayers, IEventHandlerRoundStart, IEventHandlerTeamRespawn, IEventHandlerDisconnect
     {
         private readonly PpPlugin plugin;
 
@@ -40,6 +40,9 @@ namespace PlayerPreferences
             plugin.RefreshConfig();
         }
 
+        
+        
+        Dictionary<string,KeyValuePair<Role,int>> last_roles_count = new Dictionary<string, KeyValuePair<Role, int>>();
         public void OnRoundStart(RoundStartEvent ev)
         {
             Player[] players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToArray();
@@ -52,13 +55,26 @@ namespace PlayerPreferences
             int changes = 0;
             foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
             {
-                
-                plugin.Debug($"{playerRole.Key.Name} is {playerRole.Key.TeamRole.Role} and should be {playerRole.Value}");
-                if (playerRole.Key.TeamRole.Role != playerRole.Value && playerRole.Value != Role.UNASSIGNED)
+                Player player = playerRole.Key;
+                Role role = playerRole.Value;
+                plugin.Debug($"{player.Name} is {player.TeamRole.Role} and should be {role}");
+                if (player.TeamRole.Role != role && role != Role.UNASSIGNED)
                 {
                     changes++;
-                    playerRole.Key.ChangeRole(playerRole.Value);
-                    plugin.Debug($"Setting {playerRole.Key.Name} to {playerRole.Value}");
+                    player.ChangeRole(role);
+                    plugin.Debug($"Setting {player.Name} to {role}");
+                }
+
+                if (last_roles_count.ContainsKey(player.IpAddress))
+                {
+                    if (last_roles_count[player.IpAddress].Key == role)
+                    {
+                        last_roles_count[player.IpAddress] = new KeyValuePair<Role,int>(role,last_roles_count[player.IpAddress].Value+1);
+                    }
+                    else
+                    {
+                        last_roles_count.Add(player.IpAddress,new KeyValuePair<Role,int>(role,1));
+                    }
                 }
             }
             plugin.Info($"Changed {changes} roles");
@@ -330,9 +346,12 @@ namespace PlayerPreferences
             }
         }
 
+        
+        
+        
+        
         private void AssignRoles(Dictionary<Player, Role> playerRoles,Role defaultRole)
         {
-           
             List<PlayerData> players = playerRoles.Where(x=>!x.Key.OverwatchMode).Where(x=>x.Value!=Role.UNASSIGNED).Select(x => new PlayerData(x.Key,x.Value,plugin)).ToList();
            
             
@@ -497,13 +516,27 @@ namespace PlayerPreferences
             }
             
             PlayerData curr = data.players[deept];
-            
+            bool reduce=false;
+            Role lastRole = Role.UNASSIGNED;
+            int reduceamount = 0;
+            if (last_roles_count.ContainsKey(curr.Player.IpAddress))
+            {
+                reduce = true;
+                lastRole = last_roles_count[curr.Player.IpAddress].Key;
+                reduceamount = last_roles_count[curr.Player.IpAddress].Value;
+            }
+                
 
             foreach (var role in curr.Record.Preferences.Reverse())
             {
                 if (data.roleCounter[(int) role +1]>0)
                 {
                     int val = curr.Record[role]??0;
+                    if (reduce)
+                    {
+                        if (role == lastRole)
+                            val -= reduceamount;
+                    }
                     plugin.Debug($"{curr.Player.Name} - {role} - {val}");
                     data.actAssign[deept] = role;
                     data.roleCounter[(int) role + 1]--;
@@ -517,6 +550,11 @@ namespace PlayerPreferences
             }
 
             return false;
+        }
+
+        public void OnDisconnect(DisconnectEvent ev)
+        {
+            last_roles_count.Remove(ev.Connection.IpAddress);
         }
     }
 }

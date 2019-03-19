@@ -9,6 +9,7 @@ using System.Security.Cryptography.X509Certificates;
 using Smod2.EventHandlers;
 using Smod2.Events;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Smod2;
 using Smod2.API;
 using Smod2.EventSystem.Events;
@@ -16,7 +17,7 @@ using UnityEngine;
 
 namespace PlayerPreferences
 {
-    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerSetConfig, IEventHandlerWaitingForPlayers, IEventHandlerRoundStart, IEventHandlerTeamRespawn, IEventHandlerDisconnect
+    public class EventHandlers : IEventHandlerPlayerJoin, IEventHandlerCallCommand, IEventHandlerSetConfig, IEventHandlerWaitingForPlayers, IEventHandlerRoundStart, IEventHandlerTeamRespawn, IEventHandlerFixedUpdate, IEventHandlerUpdate
     {
         private readonly PpPlugin plugin;
 
@@ -33,6 +34,17 @@ namespace PlayerPreferences
             {
                 plugin.Preferences.Remove(ev.Player.SteamId);
             }
+
+            lock (last_roles_count)
+            {
+                if (!last_roles_count.ContainsKey(ev.Player.IpAddress)){
+                    last_roles_count.Add(ev.Player.IpAddress,new PlayerMem());
+                }
+                else
+                {
+                    last_roles_count[ev.Player.IpAddress].lastSeen = DateTime.Now;
+                }   
+            }
         }
 
         public void OnWaitingForPlayers(WaitingForPlayersEvent ev)
@@ -42,42 +54,56 @@ namespace PlayerPreferences
 
         
         
-        Dictionary<string,KeyValuePair<Role,int>> last_roles_count = new Dictionary<string, KeyValuePair<Role, int>>();
+        Dictionary<string,PlayerMem> last_roles_count = new Dictionary<string, PlayerMem>();
         public void OnRoundStart(RoundStartEvent ev)
         {
             Player[] players = ev.Server.GetPlayers().Where(x => x.SteamId != "0").ToArray();
-            PpPlugin.Shuffle(players);
-            
-            Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
-
-            plugin.Info("Calculating optimal starting player roles...");
-            AssignRoles(playerRoles,Role.CLASSD);
-            int changes = 0;
-            foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
+            new Thread(() =>
             {
-                Player player = playerRole.Key;
-                Role role = playerRole.Value;
-                plugin.Debug($"{player.Name} is {player.TeamRole.Role} and should be {role}");
-                if (player.TeamRole.Role != role && role != Role.UNASSIGNED)
-                {
-                    changes++;
-                    player.ChangeRole(role);
-                    plugin.Debug($"Setting {player.Name} to {role}");
-                }
+                PpPlugin.Shuffle(players);
 
-                if (last_roles_count.ContainsKey(player.IpAddress))
+                Dictionary<Player, Role> playerRoles = players.ToDictionary(x => x, x => x.TeamRole.Role);
+
+                plugin.Info("Calculating optimal starting player roles...");
+                AssignRoles(playerRoles, Role.CLASSD);
+                lock (actions)
                 {
-                    if (last_roles_count[player.IpAddress].Key == role)
+                    actions.Enqueue(()=>
                     {
-                        last_roles_count[player.IpAddress] = new KeyValuePair<Role,int>(role,last_roles_count[player.IpAddress].Value+1);
-                    }
-                    else
-                    {
-                        last_roles_count.Add(player.IpAddress,new KeyValuePair<Role,int>(role,1));
-                    }
+                        int changes = 0;
+                        foreach (KeyValuePair<Player, Role> playerRole in playerRoles)
+                        {
+                            Player player = playerRole.Key;
+                            Role role = playerRole.Value;
+                            plugin.Debug($"{player.Name} is {player.TeamRole.Role} and should be {role}");
+                            if (player.TeamRole.Role != role && role != Role.UNASSIGNED)
+                            {
+                                changes++;
+                                player.ChangeRole(role);
+                                plugin.Debug($"Setting {player.Name} to {role}");
+                            }
+
+                            lock (last_roles_count)
+                            {
+                                if (last_roles_count.ContainsKey(player.IpAddress))
+                                {
+                                    if (last_roles_count[player.IpAddress].lastRole == role)
+                                    {
+                                        last_roles_count[player.IpAddress].count++;
+                                    }
+                                    else
+                                    {
+                                        last_roles_count[player.IpAddress].count = 0;
+                                        last_roles_count[player.IpAddress].lastRole = role;
+                                    }
+                                }
+                            }
+                        }
+                        plugin.Info($"Changed {changes} roles");
+                    });
                 }
-            }
-            plugin.Info($"Changed {changes} roles");
+            }).Start();
+
         }
 
         public void OnCallCommand(PlayerCallCommandEvent ev)
@@ -485,9 +511,9 @@ namespace PlayerPreferences
             {
                 this.players = players;
                 this.roleCounter = new int[19];
-                this.bestRoleCounter = new int[19];
+                bestRoleCounter = new int[19];
                 Array.Copy(roleCounter,this.roleCounter,roleCounter.Length);
-                Array.Copy(roleCounter,this.bestRoleCounter,roleCounter.Length);
+                Array.Copy(roleCounter,bestRoleCounter,roleCounter.Length);
                 bestAssign = Enumerable.Repeat(Role.UNASSIGNED,players.Length).ToArray();
                 actAssign = Enumerable.Repeat(Role.UNASSIGNED,players.Length).ToArray();
                 bestSum = -1;
@@ -516,27 +542,22 @@ namespace PlayerPreferences
             }
             
             PlayerData curr = data.players[deept];
-            bool reduce=false;
-            Role lastRole = Role.UNASSIGNED;
-            int reduceamount = 0;
-            if (last_roles_count.ContainsKey(curr.Player.IpAddress))
+            Role lastRole;
+            int reduceamount;
+            
+            lock (last_roles_count)
             {
-                reduce = true;
-                lastRole = last_roles_count[curr.Player.IpAddress].Key;
-                reduceamount = last_roles_count[curr.Player.IpAddress].Value;
+                lastRole = last_roles_count[curr.Player.IpAddress].lastRole;
+                reduceamount = last_roles_count[curr.Player.IpAddress].count;   
             }
                 
-
             foreach (var role in curr.Record.Preferences.Reverse())
             {
                 if (data.roleCounter[(int) role +1]>0)
                 {
                     int val = curr.Record[role]??0;
-                    if (reduce)
-                    {
-                        if (role == lastRole)
-                            val -= reduceamount;
-                    }
+                    if (role == lastRole)
+                        val -= reduceamount;
                     plugin.Debug($"{curr.Player.Name} - {role} - {val}");
                     data.actAssign[deept] = role;
                     data.roleCounter[(int) role + 1]--;
@@ -551,10 +572,48 @@ namespace PlayerPreferences
 
             return false;
         }
-
-        public void OnDisconnect(DisconnectEvent ev)
+        public void OnFixedUpdate(FixedUpdateEvent ev)
         {
-            last_roles_count.Remove(ev.Connection.IpAddress);
+            List<String> toRemove = new List<string>();
+            List<String> ipAddresses = plugin.Server.GetPlayers().Select(p => p.IpAddress).ToList();
+            DateTime limit = DateTime.Now.AddMinutes(- 5);
+            lock (last_roles_count)
+            {
+                foreach (var ipaddres in last_roles_count.Keys)
+                {
+                    if (ipAddresses.Contains(ipaddres))
+                        continue;
+                    if (last_roles_count[ipaddres].lastSeen < limit)
+                        toRemove.Add(ipaddres);
+                }
+
+                foreach (var ip in toRemove)
+                {
+                    last_roles_count.Remove(ip);
+                }
+            }
+        }
+        
+        
+        private class PlayerMem
+        {
+            public Role lastRole = Role.UNASSIGNED;
+            public int count = 0;
+            public DateTime lastSeen = DateTime.Now;
+        }
+
+        
+        
+        Queue<Runnable> actions = new Queue<Runnable>();
+        public void OnUpdate(UpdateEvent ev)
+        {
+            lock (actions)
+            {
+                if (actions.Count > 0)
+                {
+                    actions.Dequeue().Invoke();
+                }
+            }
         }
     }
 }

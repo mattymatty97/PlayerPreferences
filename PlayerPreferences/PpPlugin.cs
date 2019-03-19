@@ -19,7 +19,7 @@ namespace PlayerPreferences
         SmodMajor = 3,
         SmodMinor = 2,
         SmodRevision = 0,
-        version = "1.2.1 - matty Mod"
+        version = "1.2.1 - matty Mod v2"
             )]
     public class PpPlugin : Plugin
     {
